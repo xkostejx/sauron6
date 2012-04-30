@@ -10,6 +10,8 @@ use Time::Local;
 use Sauron::DB;
 use Sauron::Util;
 use Sauron::BackEnd;
+use Net::IP qw(:PROC);
+
 use strict;
 use vars qw($VERSION @ISA @EXPORT);
 
@@ -41,6 +43,7 @@ my($CGI_UTIL_zoneid,$CGI_UTIL_zone);
 my($CGI_UTIL_serverid,$CGI_UTIL_server);
 
 my %aml_type_hash = (0=>'CIDR',1=>'ACL',2=>'Key');
+our $chckInetFamily = undef;
 
 sub cgi_util_set_zone($$) {
   my ($id,$name) = @_;
@@ -135,8 +138,8 @@ sub form_check_field($$$) {
     return 'valid pathname required!'
       unless ($value =~ /^(|\S+\/)$/);
   } elsif ($type eq 'ip') {
-    return 'valid IP number required!' unless 
-      ($value =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/);
+      $chckInetFamily = ip_get_version($value);
+      return 'valid IP number required!' unless is_cidr($value);
   } elsif ($type eq 'cidr') {
     return 'valid CIDR (IP) required!' unless (is_cidr($value));
   } elsif ($type eq 'text') {
@@ -166,8 +169,8 @@ sub form_check_field($$$) {
   } elsif ($type eq 'bool') {
     return 'boolean value required!' unless ($value =~ /^(t|f)$/);
   } elsif ($type eq 'mac') {
-    return 'Ethernet address required!'
-      unless ($value =~ /^([0-9A-F]{12})$/);
+    return 'Ethernet address required!' if ($value !~ /^([0-9A-F]{12})$/ and $chckInetFamily == 4);
+    return 'Valid DUID required!' if ($value !~ /^([0-9A-F]{4})$/ and $chckInetFamily == 6);
   } elsif ($type eq 'printer_class') {
     return 'Valid printer class name required!'
       unless ($value =~ /^\@[a-zA-Z]+$/);
