@@ -9,7 +9,7 @@ use Time::Local 'timelocal_nocheck';
 use Digest::MD5;
 use Net::Netmask;
 use POSIX qw(strftime);
-use Net::IP;
+use Net::IP qw(:PROC);
 use strict;
 use vars qw($VERSION @ISA @EXPORT);
 
@@ -376,9 +376,10 @@ sub is_ip6_prefix($) {
 sub is_ip6($) {
   my($ip6) = @_;
 
-  return 0 if ($ip6 =~ /\/\d+$/);
-  return 0 unless (normalize_ip6($ip6));
-  return 1;
+  #return 0 if ($ip6 =~ /\/\d+$/);
+  #return 0 unless (normalize_ip6($ip6));
+  #return 1;
+  return ip_is_ipv6($ip6);
 }
 
 # converts IPv6 with prefix into IP6.INT domain name

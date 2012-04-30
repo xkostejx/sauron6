@@ -8,6 +8,11 @@ require Exporter;
 use Net::Netmask;
 use Sauron::DB;
 use Sauron::Util;
+use Sys::Syslog qw(:DEFAULT setlogsock);
+Sys::Syslog::setlogsock('unix');
+use Data::Dumper;
+use Net::IP qw (:PROC);
+
 use strict;
 use vars qw($VERSION @ISA @EXPORT);
 
@@ -153,6 +158,18 @@ $VERSION = '$Id: BackEnd.pm,v 1.73 2008/03/31 08:43:32 tjko Exp $ ';
 
 my($muser);
 
+sub write2log
+{
+  #my $priority  = shift;
+  my $msg       = shift;
+  my $filename  = File::Basename::basename($0);
+
+  Sys::Syslog::openlog($filename, "cons,pid", "debug");
+  Sys::Syslog::syslog("info", "$msg");
+  Sys::Syslog::closelog();
+} # End of write2log
+
+
 sub fix_bools($$) {
   my($rec,$names) = @_;
   my(@l,$name,$val);
@@ -219,25 +236,44 @@ sub auto_address($$) {
 sub next_free_ip($$)
 {
   my($serverid,$ip) = @_;
-  my(@q,@ips,%h,$net,$i,$t);
+  my(@q,@ips,%h,$net,$i,$t, $family);
 
   return '' unless ($serverid > 0);
   return '' unless (is_cidr($ip));
+  return '' unless ($family = ip_get_version($ip));
+
+  #First IP is network address
+  my $firstIPshift = 1;
+  #UWB Pilsen has first IP ::1:0/112 => + 2^16 hosts
+  #Need global config
+  $firstIPshift += 2 ** 16 if $family == 6;
 
   db_query("SELECT net FROM nets WHERE server=$serverid AND net >> '$ip' " .
-	   "ORDER BY net DESC",\@q);
-  return '' unless (@q > 0);
+	   "ORDER BY masklen(net) DESC LIMIT 1",\@q);
+  return 'chyba' unless (@q > 0);
   db_query("SELECT a.ip FROM hosts h , a_entries a, zones z " .
 	   "WHERE z.server=$serverid AND h.zone=z.id AND a.host=h.id " .
 	   " AND '$q[0][0]' >> a.ip ORDER BY a.ip;",\@ips);
-  for $i (0..$#ips) { $h{$ips[$i][0]} = 1; }
-  $net = new Net::Netmask($q[0][0]);
-  $i = ip2int($ip) + 1;
-  while ($net->match(($t=int2ip($i)))) {
-    return $t unless ($h{$t});
-    $i++;
-  }
+
+  my $rangeIP = new Net::IP($q[0][0]) or return '';
+ 
+  my @usedIP;
+  push @usedIP, $_ foreach @ips;
+  
+  #Skip network address + firstIPshift :]
+  $rangeIP += $firstIPshift;
+
+  #Nasty use ip_compress_address due $ip->short() bug in IPv4 
+  do{
+	#skip IPv4 broadcast address
+	return ''  if $family == 4 and $rangeIP->ip() eq $rangeIP->last_ip();
+
+	return ip_compress_address($rangeIP->ip(), $family) 
+	unless ( grep {$_->[0] eq ip_compress_address($rangeIP->ip(), $family)} @usedIP ) ;
+  } while (++$rangeIP);
+
   return '';
+
 }
 
 sub ip_in_use($$) {
