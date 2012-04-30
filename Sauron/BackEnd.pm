@@ -2659,12 +2659,12 @@ sub add_net($) {
   $rec->{cuser}=$muser;
 
   return -100 unless (is_cidr($rec->{net}));
-  $net = new Net::Netmask($rec->{net});
+  $net = new Net::IP($rec->{net});
   return -101 unless ($net);
-  $rec->{range_start}=$net->nth(1)
+  $rec->{range_start}= ip_compress_address((++$net)->ip(), $net->version()) 
     unless (is_cidr($rec->{range_start}));
-  $rec->{range_end}=$net->nth(-2)
-    unless (is_cidr($rec->{range_end}));
+  $rec->{range_end}= ($net->version() eq 4 ? new Net::Netmask($rec->{net})->nth(-2) : ip_compress_address($net->last_ip(), $net->version())) 
+   unless (is_cidr($rec->{range_end}));
 
   $res = add_record('nets',$rec);
   if ($res < 0) { db_rollback(); return -1; }
