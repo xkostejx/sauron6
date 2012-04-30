@@ -1,0 +1,749 @@
+#!/usr/bin/perl -I/usr/local/sauron
+#
+# import - imports BIND configuration/databases
+#
+# Copyright (c) Timo Kokkonen <tjko@iki.fi>  2000-2003.
+# $Id: import,v 1.40 2004/01/19 11:36:05 tjko Exp $
+#
+require 5;
+use Net::Netmask;
+use Getopt::Long;
+use Sauron::DB;
+use Sauron::Util;
+use Sauron::UtilZone;
+use Sauron::BackEnd;
+use Sauron::Sauron;
+
+load_config();
+
+# if these are not defined, then values are taken from first master zone
+# processed...
+# $hostmaster = 'hostmaster.foobar.org';
+# $primaryservername = 'ns.foobar.org.';
+
+##############################
+
+GetOptions("help|h","orphans=s","notransaction","verbose|v","dir=s");
+
+if ($opt_help || @ARGV < 2) {
+    print "syntax: $0 [options] <servername> <named.conf file>\n";
+    print "options:\n",
+          "\t--orphans=<zonename>\tzone for 'orphan' PTR record hosts\n",
+	  "\t--notrasaction\t\tdo not use transactions (speeds up things)\n",
+	  "\t--dir=<directory>\tdirectory where config files are located\n",
+	  "\t\t\t\t(if not in directory specified in named.conf)\n",
+	  "\t--verbose\t\tdisplay more detailed progress reports\n",
+	  "\t--help\t\t\tdisplay this help\n\n";
+    print "" if ($opt_help);
+    exit(1);
+}
+
+$opt_verbose = ($opt_verbose ? 1 : 0);
+$servername = $ARGV[0];
+$namedf = $ARGV[1];
+$user = (getpwuid($<))[0];
+$cdate = time;
+%zonedata = {};
+
+$LOOPBACK_NET='127.0.0.0/24' unless ($LOOPBACK_NET);
+$LOOPBACK_ZONE='localhost.' unless ($LOOPBACK_ZONE);
+
+db_connect();
+set_muser($user);
+
+fatal("cannot open named.conf ($namedf)") unless (-r $namedf);
+
+if ($namedf =~ /(^.*\/)/) { 
+    $dir=$1;
+} else {
+    $dir="./";
+}
+
+if ($opt_verbose) {
+  print "Zone for orphan records: $opt_orphans\n" if ($opt_orphans);
+}
+#print "servername: $servername\n";
+#print "dir: $dir\n";
+
+#db_debug(1);
+
+############################################
+# parse named.conf
+
+open(NAMEDCONF,"$namedf") || fatal("cannot open named.conf ($namedf)");
+$buf='';
+
+while (<NAMEDCONF>) {
+  chomp;
+  s/(\/\/|\#).*$//; # eat one-line comments
+  s/\/\*.*\*\///g;  # eat one-line comments
+  next if (/^\s*$/);
+
+  # handle multi-line comments
+  if (/^(.*?)\/\*/) {
+    #print "comment begin '$1'\n";
+    $l = $1;
+    while(<NAMEDCONF>) {
+      chomp;
+      #print "comment end: '$_'\n";
+      if (/^.*?\*\/(.*)$/) {
+	$_ = $l . $1;
+	last;
+      }
+    }
+  }
+
+  s/\s+/\ /g; # eat extra whitespaces
+  s/(^\s+|\s+$)//g;
+
+  s/{\s*/{\n/g;
+  s/;\s*/;\n/g;
+  $buf.=$_; $partial='';
+  @p=split(/\n/,$buf);
+  foreach $tmp (@p) {
+    $tmp =~ s/(^\s+|\s+$)//g;
+    $tmp =~ s/\s+\;/\;/g;
+    if ($tmp =~ /[\{\;]\s*$/) {
+      #print "'$tmp'\n";
+      push @NAMEDCONF, $tmp;
+    } else {
+      $partial=$tmp;
+    }
+  }
+  $buf=$partial;
+}
+push @NAMEDCONF, $partial if ($partial);
+close(NAMEDCONF);
+
+push @allow_transfer, [];
+
+foreach $line (@NAMEDCONF) {
+  $_ = $line;
+  s/\s+/\ /g;
+  next if (/^\s*$/);
+
+  if ( /^\s*([A-Za-z\-\_]+)\s*{(.*$)/ ) {
+    #print "begin '$1'\n";
+    push @block,$1;
+    next;
+  }
+
+  if ( /^\s*zone\s+\"(.*?)\"(\s+(in|hs|hesiod|chaos))?\s*{/ ) {
+    #print "begin 'zone $1'\n";
+    push @block, "zone $1";
+    push @zones, $1;
+    next;
+  }
+
+  if ( /(^.*?)};/ ) {
+    #print "end '$block[$#block]'\n";
+    pop @block;
+    next;
+  }
+
+  $cur = $block[$#block];
+  $prev = "";
+  $prev = $block[$#block -1] if ($#block > 0);		
+
+  $line = $_;
+  $line =~ s/(^\s+|;\s*$)//g;			
+		
+  if ($cur =~ "options")  {
+    if ( /directory\s+\"(.*?)\"\s*;/ ) {
+      $directory=$1; 
+      print "directory=$directory\n" if ($opt_verbose);
+      next;
+    }
+    if ( /version\s+\"(.*?)\"\s*;/ ) {
+      $version=$1;
+      print "version=$version\n" if ($opt_verbose);
+      next;
+    }
+  }
+   if ($prev =~ "options") {
+       if ($cur =~ "allow-transfer" && is_cidr($line) ) {
+	   $ip=$line;
+	   #print "allow transfer ip=$ip\n" if ($opt_verbose);
+	   push @allow_transfer, [0,$ip,''];
+	   next;
+       }
+   }
+
+   if ($cur =~ /^zone (.*)$/) {
+       $curzone = $1;
+       if ( /type\s+(\S+)\s*;/ ) {
+	   #print "type=$1\n";
+	   $types{$curzone} = $1;
+	   next;
+       }
+       if ( /file\s+"(\S+)"\s*;/ ) {
+	   #print "file=$1\n";
+	   $files{$curzone} = $1;
+	   $named_ca = $1 if ($curzone eq '.');
+	   next;
+       }
+       if ( /check\-names\s+(\S+)\s*;/ ) {
+	   #print "check-names=$1\n";
+	   $checknames{$curzone} = $1;
+	   next;
+       }
+       if ( /notify\s+(\S+)\s*;/ ) {
+	   #print "notify=$1\n";
+	   $notify{$curzone} = ("\L$1" eq 'no' ? 'no' : 'yes');
+	   next;
+       }
+   }
+   if ($prev =~ /^zone\s+(.*)$/) {
+       $curzone=$1;
+       if ($cur =~ "masters" && is_cidr($line) ) {
+           $ip=$line;
+	   #print "master ($curzone) ip=$ip\n";
+	   $ref = $masters{$curzone};
+	   unless ($ref) {
+	     $masters{$curzone}=[];
+	     $ref = $masters{$curzone};
+	   }
+	   push @{$ref}, [0,$ip,''];
+	   next;
+       }
+       if ($cur =~ "allow-update" && is_cidr($line) ) {
+	   $ip=$line;
+	   #print "allow-update ($curzone) ip=$ip\n";
+	   $ref = $allowupdate{$curzone};
+	   unless ($ref) {
+	     $allowupdate{$curzone}=[];
+	     $ref = $allowupdate{$curzone};
+	   }
+	   push @{$ref}, [0,$ip,''];
+	   next;
+       }
+       if ($cur =~ "also-notify" && is_cidr($line) ) {
+	   $ip=$line;
+	   #print "also-notify ($curzone) ip=$ip\n";
+	   $ref = $alsonotify{$curzone};
+	   unless ($ref) {
+	     $alsonotify{$curzone}=[];
+	     $ref = $alsonotify{$curzone};
+	   }
+	   push @{$ref}, [0,$ip,''];
+	   next;
+       }
+   }
+
+    print "UNPROCESSED line ($cur): $_\n";
+}
+
+$c = @zones;
+
+print "Found $c zones from named.conf ($namedf)\n";
+fatal("no directory option in named.conf!") if ($directory eq '');
+if ($opt_dir) {
+  chdir($opt_dir) || fatal("cannot chdir to: $opt_dir");
+  print "(using $opt_dir instead of $directory)\n";
+} else {
+  chdir($directory) || fatal("cannot chdir to: $directory");
+}
+
+unless ($opt_notransaction) {
+  db_begin();
+  db_ignore_begin_and_commit(1);
+}
+
+
+##################################
+# create server record
+
+$named_ca = 'named.ca' unless ($named_ca);
+$serverid = add_server({
+			name=>$servername,
+			comment=>'imported from named.conf',
+			named_ca=>$named_ca,
+			directory=>$directory,
+			version=>$version,
+			allow_transfer=>\@allow_transfer
+		       });
+
+fatal("Cannot create server record '$servername' ($serverid)")
+			       if ($serverid < 0);
+print "server id=$serverid\n" if ($opt_verbose);
+
+
+#########################################
+# create zones
+
+$loopback = new Net::Netmask($LOOPBACK_NET);
+$loopback_reverse=($loopback->inaddr())[0];
+
+# make sure in-adrr.arpa (reverse) zones are processed first
+# (so we can use this information when adding hosts to decide
+#  wheter hosts' A records should have PTR records or not)
+for $i (0..$#zones) {
+  push @zones2, $zones[$i] if ($zones[$i] =~ /\.in-addr\.arpa/);
+}
+for $i (0..$#zones) {
+  push @zones2, $zones[$i] unless ($zones[$i] =~ /\.in-addr\.arpa/);
+}
+@zones=@zones2;
+
+
+########################
+# process zones
+for ($i=0; $i <= $#zones; $i+=1) {
+  $zone=$zones[$i];
+  next if ($zone eq '.');
+  $zone =~ s/\.$//g;
+  if ($zone =~ /\.$/) { $origin=$zone; } else { $origin = $zone . '.'; }
+  $rev='false';
+  $rev='true' if ($zone =~ /\.in-addr\.arpa/);
+
+  print "zone: '$zone' ";
+
+  if ($zone =~ /$LOOPBACK_ZONE|$loopback_reverse/) {
+    $loopback = 'true';
+    print "loopback ";
+  } else {
+    $loopback = 'false';
+  }
+
+
+  $type='M';
+  $type='S' if ($types{$zones[$i]} eq 'slave');
+  $check_names=$checknames{$zones[$i]};
+  if ($check_names =~ /ignore/) { $check_names='I'; }
+  elsif ($check_names =~ /fail/) { $check_names='F'; }
+  elsif ($check_names =~ /warn/) { $check_names='W'; }
+  else { $check_names='D'; };
+  $nnotify='D';
+  $nnotify='N' if ($notify{$zones[$i]} eq 'no');
+  $nnotify='Y' if ($notify{$zones[$i]} eq 'yes');
+
+
+  undef %tmphash;
+  $tmphash{server}=$serverid;
+  $tmphash{type}=$type;
+  $tmphash{reverse}=$rev;
+  $tmphash{name}=$zone;
+  $tmphash{chknames}=$check_names;
+  $tmphash{nnotify}=$nnotify;
+  $tmphash{also_notify}=$alsonotify{$zones[$i]} if ($alsonotify{$zones[$i]});
+  $tmphash{masters}=$masters{$zones[$i]}  if ($masters{$zones[$i]});
+  $tmphash{allow_update}=$allowupdate{$zones[$i]}
+    if ($allowupdate{$zones[$i]});
+
+  if (($zoneid = add_zone(\%tmphash)) < 0) {
+    print "zone allready exists! skipping\n";
+    next;
+  }
+  print " (id=$zoneid) ";
+  $oips_zid=$zoneid  if ($opt_orphans eq "$zone");
+
+
+  # handle slave (& other) zones
+  unless ($type eq 'M') {
+    print "slave zone\n";
+    next;
+  }
+
+  fatal("cannot get zone record ($zone)") if (get_zone($zoneid,\%zone) < 0);
+
+
+  $zonenamemask.='|' if ($zonenamemask);
+  $zonenamemask.=$zone if ($rev eq 'false');
+
+  #handle master zones
+  undef %zonedata;
+  if (! -f $files{$zones[$i]} ) {
+    fatal("cannot find: '$files{$zones[$i]}' zone file");
+  }
+
+  process_zonefile($files{$zones[$i]},$zone,\%zonedata,0);
+  print " found " . keys(%zonedata) . " domainames in zone\n";
+  $rec = $zonedata{$origin};
+  fatal("No SOA record found in zone $zone! ($origin)")
+    unless ($rec && $rec->{SOA});
+
+  $ttl=$rec->{TTL};
+  $class=$rec->{CLASS};
+  @soa = split(/\s+/,$rec->{SOA});
+  $mailbox = $soa[1];
+  $hostmaster = $mailbox unless ($hostmaster);
+  $primaryservername = $soa[0] unless ($primaryservername);
+
+  undef %tmphash;
+  $tmphash{id}=$zoneid;
+  $tmphash{type}=$type;
+  $tmphash{ns}=[[0]];
+  foreach $rtmp (@{$rec->{NS}}) { push @{$tmphash{ns}}, [0,$rtmp,'',2];  }
+  if ($rev eq 'true') {
+    # do nothing if reverse zone
+  } else {
+    $tmphash{mx}=[[0]];
+    foreach $rtmp (@{$rec->{MX}}) {
+      next unless $rtmp =~ /^\s*(\d+)\s+(\S+)\s*$/;
+      push @{$tmphash{mx}}, [0,$1,$2,'',2];
+    }
+    $tmphash{txt}=[[0]];
+    foreach $rtmp (@{$rec->{TXT}}) { push @{$tmphash{txt}}, [0,$rtmp,'',2]; }
+  }
+
+  $tmphash{class}=$class;
+  $tmphash{ttl}=$ttl if ($ttl > 0);
+  $tmphash{hostmaster}=$mailbox if ($mailbox ne $hostmaster);
+  $tmphash{serial}=$soa[2];
+  $tmphash{refresh}=$soa[3];
+  $tmphash{retry}=$soa[4];
+  $tmphash{expire}=$soa[5];
+  $tmphash{minimum}=$soa[6];
+  $tmphash{reverse}=$rev;
+
+  $res = update_zone(\%tmphash);
+  fatal("Cannot update zone record '$zone'") if ($res < 0);
+
+
+  if ($rev eq 'true') {
+    #handle reverse zone
+
+    # add subnet delegations & build PTR map
+    foreach $host (keys %zonedata) {
+      $rec = $zonedata{$host};
+      next if ($host eq $origin);
+      $host2=remove_origin($host,$origin);
+
+      if (@{$rec->{PTR}} > 0) {
+	$ip = arpa2cidr($host2 . "." . $origin);
+	next unless ($ip =~ s/\/32$//);
+	$ipworld{$ip}=[] unless ($ipworld{$ip});
+	for $j (0..$#{$rec->{PTR}}) {
+	  push @{$ipworld{$ip}}, $rec->{PTR}->[$j];
+	}
+      }
+
+      next unless (@{$rec->{NS}}>0);
+
+      undef @nsl;
+      foreach $rtmp (@{$rec->{NS}}) { push @nsl, [0,$rtmp,'']; }
+
+      $res = add_host({zone=>$zoneid,type=>2,domain=>$host2,
+		       class=>$class,ns_l=>\@nsl});
+      fatal("cannot insert reverse delegation record '$host'") if ($res < 0);
+      print STDERR "@";
+    }
+
+    print "\n";
+    next;
+  }
+
+
+  # handle normal zone
+
+
+  # add host record for zone....
+  fatal("Cannot find host record for zone $zone")
+    if (($zonehostid=$zone{zonehostid}) < 0);
+
+  undef @gluelist;
+  undef %mxhash;
+  undef %wkshash;
+
+  # first build MX and WKS entry tables....
+  foreach $host (keys %zonedata) {
+    $rec=$zonedata{$host};
+    $mxlist = db_build_list_str($rec->{MX});
+    $wkslist = db_build_list_str($rec->{WKS});
+    $mxhash{$mxlist}+=1 if (length($mxlist) > 0);
+    $wkshash{$wkslist}+=1 if (length($wkslist) > 0);
+  }
+
+  foreach $wks (keys %wkshash) {
+    $c=$wkshash{$wks};
+    #print "wks: '$wks' $c\n";
+    $wks_i_count++;
+    undef @wksl;
+    $tmplist=db_decode_list_str("{$wks}");
+    foreach $rtmp (@{$tmplist}) {
+      next unless $rtmp =~ /^\s*(\S+)(\s+(\S.*))?\s*$/;
+      push @wksl, [0,$1,$3,''];
+    }
+    $res=add_wks_template({server=>$serverid,name=>"$servername:$wks_i_count",
+			   wks_l=>\@wksl});
+    fatal("cannot insert record into wks_templates ($res)") if ($res < 0);
+    $wkshash{$wks}=$res;
+  }
+
+  foreach $mx (keys %mxhash) {
+    $c=$mxhash{$mx};
+    #print "mx: '$mx' $c\n";
+    $mx_i_count++;
+    undef @mxl;
+    $tmplist=db_decode_list_str("{$mx}");
+    foreach $rtmp (@{$tmplist}) {
+      next unless $rtmp =~ /^\s*(\d+)\s+(\S+)\s*$/;
+      push @mxl, [0,$1,$2,''];
+    }
+    $res=add_mx_template({zone=>$zoneid,name=>"$zone:$mx_i_count",
+			  mx_l=>\@mxl});
+    fatal("cannot insert record in mx_templates") if ($res < 0);
+    $mxhash{$mx}=$res;
+  }
+
+
+  # insert records in hosts table....
+  $c = keys %zonedata;
+  print STDERR "Inserting $c host records...";
+  undef @ilist;
+
+  foreach $host (keys %zonedata) {
+    $rec = $zonedata{$host};
+    next unless ($rec->{CNAME} eq '');
+    next if ($host eq $origin);
+
+    #print "$host\n";
+    $nslist = db_build_list_str($rec->{NS});
+    $mxlist = db_build_list_str($rec->{MX});
+    $wkslist = db_build_list_str($rec->{WKS});
+    $hinfo1=$rec->{HINFO}[0];
+    $hinfo2=$rec->{HINFO}[1];
+    $mx=($mxhash{$mxlist} ? $mxhash{$mxlist} : -1);
+    $wks=($wkshash{$wkslist} ? $wkshash{$wkslist} : -1);
+    $host_ttl=(($rec->{TTL} > 0 && $rec->{TTL} ne $ttl) ? $rec->{TTL}:'');
+    $host2=remove_origin($host,$origin);
+    if (@{$rec->{TXT}} > 0) {
+      $tmplist=[];
+      for $k (0..$#{$rec->{TXT}}) {
+	push(@{$tmplist}, $rec->{TXT}->[$k])
+	  unless ($rec->{TXT}->[$k] =~ /^IP alias for (\S+)$/);
+      }
+      $rec->{TXT}=$tmplist;
+    }
+    if (@{$rec->{TXT}} == 1) {
+      $extrainfo=$rec->{TXT}->[0];
+      $rec->{TXT}=[];
+    } else {
+      $extrainfo='';
+    }
+
+    $hosttype=0; # misc / unknown entry type
+    $hosttype=1 if (@{$rec->{A}} > 0); # host
+    $hosttype=2 if ($nslist ne '' && $host2 ne '@'); # delegated subdomains
+    $hosttype=3 if ($nslist eq '' && @{$rec->{A}} < 1 && @{$rec->{MX}} > 0);
+    $hosttype=8 if (@{$rec->{SRV}} > 0);
+
+    if ($hosttype == 2) {
+      if ($host =~ /in-addr\.arpa/) {
+	print STDERR "\nIGNORING reverse delegation $host in zone $zone \n",
+                     " (reverse mapping stuff should be in in-arpa zone)\n";
+	delete $zonedata{$host};
+	next;
+      }
+
+      # check for NS entries requiring (possibly) glue records
+      foreach $gns (@{$rec->{NS}}) {
+	if ($gns =~ /^(\S*($host2))(\.$origin)?$/) {
+	  #print "ns: $gns 1=$1 2=$2 3=$3\n";
+	  push @gluelist, $1;
+	}
+      }
+    }
+
+    if ($hosttype == 0) {
+      print STDERR "\nIGNORING unknown host entry '$host' in zone $zone\n";
+      delete $zonedata{$host};
+      next;
+    }
+
+    fatal("empty hostname after stripping origin '$host'") if ($host2 eq '');
+    #print STDERR "$host: many IPs\n" if (@{$rec->{A}} > 1);
+
+    push @ilist,[$zoneid,$hosttype,$host2,$class,$mx,$wks,$hinfo1,$hinfo2,
+		 $extrainfo,$host_ttl];
+  }
+  fatal("cannot insert host records")
+    if (db_insert('hosts',
+		  'zone,type,domain,class,mx,wks,hinfo_hw,hinfo_sw,info,ttl',
+		  \@ilist) < 0);
+
+
+  # fetch id's of records inserted earlier
+  undef @q;
+  $res=db_query("SELECT id,domain FROM hosts WHERE zone=$zoneid",\@q);
+  fatal("Cannot select previously inserted host records!") if ($res < 0);
+  print STDERR "(",int(@q),")";
+  for $j (0..$#q) {
+    $id=$q[$j][0];
+    $dom=add_origin($q[$j][1],$origin);
+    if ($zonedata{$dom}) {
+      $zonedata{$dom}->{ID}=$id;
+    } else {
+      fatal("cannot find host '$dom' from hash! (unexpected error)");
+    }
+  }
+
+
+  # insert SRV records
+
+  undef @ilist;
+  print STDERR "+";
+  foreach $host (keys %zonedata) {
+    $rec = $zonedata{$host};
+    next unless (@{$rec->{SRV}} > 0);
+
+    unless ($rec->{ID} > 0) {
+      warn("cannot find ID for $host (SRV)");
+      next;
+    }
+
+    foreach $rtmp (@{$rec->{SRV}}) {
+      @stmp = split (' ',$rtmp);
+      push @ilist, [1,$rec->{ID},$stmp[0],$stmp[1],$stmp[2],$stmp[3]];
+    }
+  }
+  fatal("cannot insert srv_entries!")
+    if (db_insert('srv_entries','type,ref,pri,weight,port,target',\@ilist)<0);
+
+
+  # insert alias (CNAME) records
+
+  print STDERR "-";
+  undef @ilist;
+  foreach $host (keys %zonedata) {
+    $rec = $zonedata{$host};
+    next unless ($rec->{CNAME});
+
+    $rec2 = $zonedata{$rec->{CNAME}};
+    unless ($rec2) {
+      #warn("cannot find aliased host $host --> $rec->{CNAME}\n");
+      $cname2=$rec->{CNAME};
+      $alias=-1;
+    } else {
+      $cname2='';
+      $alias=$rec2->{ID};
+    }
+    $host2=remove_origin($host,$origin);
+
+    push @ilist, [$cdate,$user,$zoneid,4,$host2,$class,$alias,$cname2];
+    delete $zonedata{$host};
+  }
+  fatal("cannot insert CNAME records")
+    if (db_insert('hosts','cdate,cuser,zone,type,domain,class,alias,cname_txt',
+		  \@ilist) < 0);
+
+
+
+  # add A records in a_entries
+
+  print STDERR "+";
+  undef @ilist;
+  foreach $host (keys %zonedata) {
+    $rec = $zonedata{$host};
+    $reverse='true';
+    $hostid=($host eq $origin ? $zonehostid : $rec->{ID});
+
+    if (@{$rec->{A}} < 1) {
+      warn("unexpected host without A records found '$host'")
+	if (@{$rec->{NS}} < 1  &&  @{$rec->{MX}} < 1 && @{$rec->{SRV}} < 1);
+      next;
+    }
+
+    unless ($hostid > 0) {
+      warn("no id found in hash for host $host (while adding A records)!") ;
+      next;
+    }
+
+    for $k (0..$#{$rec->{A}}) {
+      $ip=$rec->{A}[$k];
+
+      if (@{$ipworld{$ip}} > 0) { # check if PTR is needed
+	$reverse='false';
+	for $l (0..$#{$ipworld{$ip}}) {
+	  $reverse='true' if ($host eq $ipworld{$ip}->[$l]);
+	}
+      }
+      push @ilist, [$hostid,$ip,$reverse,'true'];
+    }
+
+  }
+  fatal("cannot insert A records")
+    if (db_insert('a_entries','host,ip,reverse,forward',\@ilist) < 0);
+
+
+
+  # add NS & TXT entries to ns_entries & txt_entries tables accordingly
+
+  print STDERR "-";
+  undef @ilist;
+  undef @ilist2;
+  foreach $host (keys %zonedata) {
+    next if ($host eq $origin);
+
+    $rec = $zonedata{$host};
+    $tmpid=$rec->{ID};
+    if ($tmpid < 1 || !$tmpid) {
+      warn("no id found in hash for host $host (NS/TXT)!") ;
+      next;
+    }
+
+    if (@{$rec->{NS}} > 0) {
+      foreach $rtmp (@{$rec->{NS}}) { push @ilist, [2,$tmpid,$rtmp]; }
+    }
+    if (@{$rec->{TXT}} > 0) {
+      foreach $rtmp (@{$rec->{TXT}}) { push @ilist2, [2,$tmpid,$rtmp]; }
+    }
+  }
+  fatal("cannot insert NS entries")
+    if (db_insert('ns_entries','type,ref,ns',\@ilist) < 0);
+  fatal("cannot insert TXT entries")
+    if (db_insert('txt_entries','type,ref,txt',\@ilist2) < 0);
+  print "\n";
+
+
+  if (@gluelist > 0) {
+    print "Updating glue records...\n";
+    for $host (@gluelist) {
+      $res = db_exec("UPDATE hosts SET type=6 WHERE zone=$zoneid " .
+		     "AND domain='$host';");
+      warn("Cannot update host record for '$host'!") if ($res < 0);
+    }
+  }
+
+} # for($i... zone loop
+
+
+
+# add host records for orphaned PTR records
+
+if ($oips_zid > 0) {
+  print "Adding host records for orphaned PTRs...(zone id=$oips_zid)\n";
+
+  foreach $ip (keys %ipworld) {
+    for $j (0..$#{$ipworld{$ip}}) {
+      $host = $ipworld{$ip}->[$j];
+      unless ($host =~ /($zonenamemask)\.?$/) {
+	print "$host ($ip)\n";
+	$res=add_host({zone=>$oips_zid,type=>1,domain=>$host,
+		       ip=>[[0,$ip,'true','false']]});
+	fatal("cannot add host record for ($host)") if ($res < 0);
+      }
+    }
+  }
+}
+
+
+$res = update_server({id=>$serverid, hostmaster=>$hostmaster,
+		      hostname=>$primaryservername});
+fatal("Cannot update server record!") if ($res < 0);
+
+
+unless ($opt_notransaction) {
+  db_ignore_begin_and_commit(0);
+  fatal("Cannot commit import to database!") if (db_commit() < 0);
+}
+
+
+#print STDERR "Vacuuming...";
+#db_vacuum();
+print STDERR "\n";
+
+
+exit(0);
+
+# eof

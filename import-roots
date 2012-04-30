@@ -1,0 +1,124 @@
+#!/usr/bin/perl -I/usr/local/sauron
+#
+# import-roots  imports root servers from named.roots (named.ca) file.
+#
+# Copyright (c) Timo Kokkonen <tjko@iki.fi>  2001-2003.
+# $Id: import-roots,v 1.11 2008/03/31 08:38:49 tjko Exp $
+#
+require 5;
+use Getopt::Long;
+use Sauron::DB;
+use Sauron::Util;
+use Sauron::UtilZone;
+use Sauron::BackEnd;
+use Sauron::Sauron;
+
+load_config();
+
+###################################################################
+
+GetOptions("help|h","update|u","verbose");
+
+if ($opt_help || @ARGV < 2) {
+  print "syntax: $0 [--help] [--update] <servername | default> <named.root>\n",
+        "\n";
+  print "" if ($opt_help);
+  exit(0);
+}
+
+$servername=shift;
+$file=shift;
+$opt_update=($opt_update ? 1 : 0);
+$opt_verbose=($opt_verbose ? 1 : 0);
+
+fatal("cannot read input file '$file'") unless (-r $file);
+
+db_connect();
+
+if ($servername eq 'default') {
+  print "Creating default root servers\n";
+  $serverid=-1;
+} else {
+  $serverid=get_server_id($servername);
+  fatal("cannot find server '$servername'") if ($serverid < 0);
+  print "Creating root servers for server: $servername (id=$serverid)\n";
+}
+
+print "Importing root servers from file: $file\n" if ($opt_verbose);
+process_zonefile($file,".",\%zonedata,0);
+$count = keys %zonedata;
+
+print "Found $count records...\n";
+
+db_begin();
+
+$acount=0;
+$ncount=0;
+
+if ($opt_update) {
+  print "Removing root servers from server: $servername\n" if ($opt_verbose);
+  $res=db_exec("DELETE FROM root_servers WHERE server=$serverid;");
+  fatal("cannot delete old root server records") if ($res < 0);
+}
+
+print "Inserting root servers to server: $servername\n" if ($opt_verbose);
+
+foreach $host (keys %zonedata) {
+  $rec=$zonedata{$host};
+  print "host: $host $rec->{TTL}\n" if ($opt_verbose);
+  $ttl=$rec->{TTL};
+  $ttl=3600000 unless ($ttl > 0);
+
+  if (@{$rec->{A}}) {
+    #print "A: " . join(",",@{$rec->{A}}) . "\n";
+    for $i (0..$#{$rec->{A}}) {
+      $ip=$rec->{A}[$i];
+      $res=db_exec("INSERT INTO root_servers (server,ttl,domain,type,value) " .
+		   " VALUES($serverid,$ttl,'$host','A','$ip');");
+      fatal("cannot insert A record") if ($res < 0);
+      $acount++;
+    }
+  }
+  if (@{$rec->{AAAA}}) {
+    #print "AAAA: " . join(",",@{$rec->{AAAA}}) . "\n";
+    for $i (0..$#{$rec->{AAAA}}) {
+      $ip=$rec->{AAAA}[$i];
+      $res=db_exec("INSERT INTO root_servers (server,ttl,domain,type,value) " .
+		   " VALUES($serverid,$ttl,'$host','AAAA','$ip');");
+      fatal("cannot insert AAAA record") if ($res < 0);
+      $aaaacount++;
+    }
+  }
+  if (@{$rec->{NS}}) {
+    #print "NS: " . join(",",@{$rec->{NS}}) . "\n";
+    for $i (0..$#{$rec->{NS}}) {
+      $ns=$rec->{NS}[$i];
+      $res=db_exec("INSERT INTO root_servers (server,ttl,domain,type,value) " .
+	      " VALUES($serverid,$ttl,'$host','NS','$ns');");
+      fatal("cannot insert NS record") if ($res < 0);
+      $ncount++;
+    }
+  }
+}
+
+
+if ($acount < 1) {
+  print STDERR "No A records found, insert failed!\n";
+  exit(1);
+}
+
+if ($ncount < 1) {
+  print STDERR "No NS records found, insert failed!\n";
+  exit(1);
+}
+
+die("commit failed") if (db_commit() < 0);
+
+print "$acount root server A records inserted\n";
+print "$aaaacount root server AAAA records inserted\n";
+print "$ncount root server NS records inserted\n";
+
+exit 0;
+
+# eof
+

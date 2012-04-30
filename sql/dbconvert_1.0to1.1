@@ -1,0 +1,73 @@
+/* convert Sauron database format from 1.0 to 1.1 */
+/* (this requires PostgreSQL v7.3 or later) */
+
+/* hosts */
+
+ALTER TABLE hosts ADD COLUMN vmps INT4;
+ALTER TABLE hosts ALTER COLUMN vmps SET DEFAULT -1;
+UPDATE hosts SET vmps=-1;
+
+ALTER TABLE hosts ADD COLUMN dhcp_last INT4;
+ALTER TABLE hosts ALTER COLUMN dhcp_last SET DEFAULT -1;
+UPDATE hosts SET dhcp_last=-1;
+
+/* users */
+INSERT INTO user_rights (type,ref,rtype,rref) SELECT 2,id,0,gid FROM users WHERE gid > 0;
+ALTER TABLE users DROP COLUMN gid;
+
+/* lastlog */
+ALTER TABLE lastlog RENAME COLUMN host TO host2;
+ALTER TABLE lastlog ADD COLUMN host TEXT;
+UPDATE lastlog SET host=host2;
+ALTER TABLE lastlog DROP COLUMN host2;
+
+/* utmp */
+ALTER TABLE utmp DROP COLUMN gid;
+
+/* vlan */
+ALTER TABLE vlans ADD COLUMN vlanno INT;
+
+/* groups */
+ALTER TABLE groups ADD COLUMN vmps INT4;
+ALTER TABLE groups ALTER COLUMN vmps SET DEFAULT -1;
+UPDATE groups SET vmps=-1;
+
+/* zones */
+ALTER TABLE zones ADD COLUMN rdate INT4;
+ALTER TABLE zones ALTER COLUMN rdate SET DEFAULT 0;
+UPDATE zones SET rdate=0;
+
+
+/* vmps table creation
+ *
+ * $Id: dbconvert_1.0to1.1,v 1.6 2005/05/13 05:54:38 tjko Exp $
+ */
+
+/** VMPS domain definitions, linked to a server record. 
+    Used for generating (Cisco) VMPS configuration files. **/
+
+CREATE TABLE vmps (
+       id	   SERIAL, /* unique ID */
+       server	   INT4 NOT NULL, /* ptr to a servers table record
+					-->servers.id */
+
+       name	   TEXT NOT NULL CHECK(name <> ''), /* name of VMPS domain */
+       description TEXT, /* long name */
+       mode        INT DEFAULT 0, /* mode: 0=open, 
+	                                   1=secure */
+       nodomainreq INT DEFAULT 0, /* no-domain-req: 0=allow, 
+                                                    1=deny */
+       fallback    INT DEFAULT -1, /* ptr to a vlans table record
+                             	        -->vlans.id */
+       comment	   TEXT, /* comments */
+
+       CONSTRAINT  vmps_key PRIMARY KEY (name,server)
+) INHERITS(common_fields);
+
+
+
+
+UPDATE settings SET value='1.1' where key='dbversion';
+
+/* eof */
+

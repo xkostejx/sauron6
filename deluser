@@ -1,0 +1,66 @@
+#!/usr/bin/perl -I/usr/local/sauron
+#
+# deluser - utility to delete users
+#
+# Copyright (c) Timo Kokkonen <tjko@iki.fi>  2000-2003.
+# $Id: deluser,v 1.10 2003/12/28 19:29:11 tjko Exp $
+#
+require 5;
+use Getopt::Long;
+use Sauron::DB;
+use Sauron::Util;
+use Sauron::BackEnd;
+use Sauron::Sauron;
+
+load_config();
+
+##############################################
+
+my($id,$res,$i,$t,@q);
+
+GetOptions("user=s","help|h");
+
+if ($opt_help) {
+  print "syntax: $0 [--help] [--user=<username>]\n";
+  print "\n" if ($opt_help);
+  exit(0);
+}
+
+db_connect();
+
+
+unless ($opt_user) {
+  print "Enter user to be deleted: ";
+  chomp($opt_user = <STDIN>);
+  $i=1;
+}
+fatal("Invalid username '$opt_user'!") unless ($opt_user =~ /^\S+$/);
+
+
+
+fatal("Cannot find user '$opt_user' from users table!")
+	  if (get_user($opt_user,\%user) < 0);
+$id=$user{id};
+
+if ($i) { # ask confirmation only in interactive session...
+  print "\t Username: $opt_user (id=$id)\n",
+        "\t Longname: $user{name}\n",
+        "\tsuperuser: " . ($user{superuser} eq 't' ? 'Yes' : 'No') ."\n",
+	"\t    email; $user{email}\n",
+        "\t  comment: $user{comment}\n";
+
+  print "Delete this user [y/n]?";
+  chomp ($t=<STDIN>);
+  unless ($t eq 'y' || $t eq 'Y') {
+    print "User not deleted!\n";
+    exit(1);
+  }
+}
+
+fatal("Cannot delete user from users table!") if (delete_user($id) < 0);
+
+
+print "User $opt_user deleted succesfully.\n";
+exit(0);
+
+# eof

@@ -1,0 +1,156 @@
+#!/usr/bin/perl -I/usr/local/sauron
+#
+# adduser - utility to create users
+#
+# Copyright (c) Timo Kokkonen <tjko@iki.fi>  2000-2003.
+# $Id: adduser,v 1.20 2005/03/29 09:26:41 tjko Exp $
+#
+require 5;
+use Time::Local;
+use Getopt::Long;
+use Sauron::DB;
+use Sauron::Util;
+use Sauron::BackEnd;
+use Sauron::Sauron;
+
+load_config();
+
+$user = (getpwuid($<))[0];
+set_muser($user);
+
+$i = ($#ARGV == -1 );   # If no args, become interactive
+
+GetOptions("user=s","superuser","help|h","passwd=s","name=s",
+	   "group=s","comment=s","email=s","expiration=s");
+
+if ($opt_help) {
+  print "syntax: $0 [--user=username] [--group=name] [--superuser] " .
+        "[--help]\n" ,
+        "\t\t[--passwd=password] [--name=\"<user's full name>\"]\n",
+	"\t\t[--email=foo\@bar] [--comment=\"comments\"]\n",
+	"\t\t[--expiration=dd-mm-yyyy]\n";
+  print "\n" if ($opt_help); # to get rid of warnings :)
+  exit(0);
+}
+
+db_connect();
+
+
+unless ($opt_user) {
+  print "Enter username: ";
+  chomp ($opt_user = <STDIN>);
+  $i=1;
+}
+fatal("Invalid username '$opt_user'!")
+  unless ($opt_user =~ /^[a-z0-9]{1,8}$/);
+fatal("User allready exists!") unless (get_user($opt_user,\%user));
+undef %user;
+
+unless ($opt_group || ! $i) {
+  print "Enter group name (empty for none): ";
+  chomp($opt_group = <STDIN>);
+}
+
+if ($opt_group) {
+  $gid=get_user_group_id($opt_group);
+  fatal("Cannot find group '$opt_group'") unless ($gid > 0);
+} else {
+  $gid=-1;
+}
+
+
+unless ($opt_name || ! $i) {
+  print "Enter user description (full name): ";
+  chomp($opt_name = <STDIN>);
+}
+
+unless ($opt_email || ! $i) {
+  print "Enter user email address: ";
+  chomp($opt_email = <STDIN>);
+}
+
+unless ($opt_comment || ! $i) {
+  print "Enter optional user info: ";
+  chomp($opt_comment = <STDIN>);
+}
+
+unless ($opt_expiration || ! $i ) {
+  print "Enter account expiration date (dd-mm-yyyy, +<n>d, +<n>y) [none]: ";
+  chomp($opt_expiration = <STDIN>);
+}
+if ($opt_expiration =~ /^\s*(\d{1,2})-(\d{1,2})-(\d{4})\s*$/) {
+  $opt_expiration=timelocal(0,0,0,$1,$2-1,$3-1900);
+} elsif ($opt_expiration =~ /^\s*\+(\d+)d$/) {
+  $opt_expiration=time() + $1 * 86400;
+} elsif ($opt_expiration =~ /^\s*\+(\d+)y$/) {
+  $opt_expiration=time() + $1 * 86400 * 365;
+} elsif ($opt_expiration =~ /^\s*$/) {
+  $opt_expiration=0;
+} else {
+  fatal("invalid expiration date specification: $opt_expiration");
+}
+
+unless ($opt_passwd) {
+  my $pmap = 'abcdefghijklmnopqrstuvwxyz' .
+             'ABCDEFGHIJKLMNOPQRSTUVWXYZ' .
+	     '0123456789+-!$#';
+  my $dpasswd;
+  for $i (1..8) { $dpasswd.=substr($pmap,int(rand(length($pmap))),1); }
+  print "Enter password [$dpasswd]: ";
+  chomp ($opt_passwd = <STDIN>);
+  $i=1;
+  $opt_passwd = $dpasswd unless($opt_passwd);
+}
+
+$opt_superuser=($opt_superuser==1?"true":"false");
+$user = (getpwuid($<))[0];
+$pwd=pwd_make($opt_passwd,$SAURON_PWD_MODE);
+
+if ($i) { # ask confirmation only in interactive session...
+  print "\t   Username: $opt_user\n",
+    "\t      Group: " . ($opt_group ? "$opt_group (GID=$gid)":"<none>") . "\n",
+    "\t   Longname: $opt_name\n",
+    "\t      email: $opt_email\n",
+    "\t    comment: $opt_comment\n",
+    "\t expiration: ". ($opt_expiration > 0 ? localtime($opt_expiration) :
+			'<none>') . "\n",
+    "\t  superuser: $opt_superuser\n",
+    "Add this user [y/n]?";
+
+  chomp($t=<STDIN>);
+  unless ($t eq 'y' || $t eq 'Y') {
+    print "User not added!\n";
+    exit(1);
+  }
+}
+
+$user{username}=$opt_user;
+$user{password}=$pwd;
+$user{name}=$opt_name;
+$user{superuser}=$opt_superuser;
+$user{email}=$opt_email;
+$user{comment}=$opt_comment;
+$user{gid}=$gid;
+$user{expiration}=$opt_expiration;
+
+my $newid;
+fatal("Cannot add user to users table: " . db_errormsg())
+  if (($newid=add_user(\%user)) < 0);
+
+if ($gid > 0) {
+    # add group membership
+    fatal("Cannot set group membership for user: $opt_user ".db_errormsg())
+	if (db_exec("INSERT INTO user_rights (type,ref,rtype,rref,rule) " .
+		    " VALUES(2,$newid,0,$gid,'')") < 0);
+}
+    
+
+print "User $opt_user added successfully.\n";
+print "Remember to give user some rights with moduser command.\n"
+	  if (($opt_superuser ne 'true') and ($gid < 1));
+
+exit(0);
+
+# eof
+
+

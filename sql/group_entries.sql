@@ -1,0 +1,18 @@
+/* group_entries table creation
+ *
+ * $Id: group_entries.sql,v 1.2 2005/05/13 05:31:54 tjko Exp $
+ */
+
+/** subgroup memberships, pointers to group records, 
+    linked to a host record. **/
+
+CREATE TABLE group_entries (
+      id	   SERIAL PRIMARY KEY, /* unique ID */
+      host	   INT4 NOT NULL, /* ptr to hosts table id
+					-->hostss.id */
+      grp          INT4 NOT NULL  /* ptr to group (this host) belogs to
+					-->groups.id */
+);
+
+CREATE INDEX group_entries_host_index ON group_entries (host);
+

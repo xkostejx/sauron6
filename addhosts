@@ -1,0 +1,210 @@
+#!/usr/bin/perl -I/usr/local/sauron
+#
+# addhosts - utility to add host records
+#
+# Copyright (c) Timo Kokkonen <tjko@iki.fi>  2001,2003.
+# $Id: addhosts,v 1.12 2003/12/28 19:29:11 tjko Exp $
+#
+require 5;
+use Getopt::Long;
+use Net::Netmask;
+use Sauron::DB;
+use Sauron::Util;
+use Sauron::UtilZone;
+use Sauron::BackEnd;
+use Sauron::Sauron;
+
+load_config();
+
+
+$user = (getpwuid($<))[0];
+set_muser($user);
+
+$result = GetOptions("help|h","name=s","commit","noreverse",
+		    "newonly","outofzone","verbose","force=s",
+		    "group=s","info=s");
+
+if ($opt_help || @ARGV < 2 || $result < 1) {
+  print "syntax: $0 <server> <zone> <file> [options]\n\n",
+        "options:\n",
+	"\t--name=<regexp>\t\thostname filter (regexp)\n",
+	"\t--newonly\t\tprocess only new records\n",
+	"\t--noreverse\t\tdo not add reverse records\n",
+	"\t--outofzone\t\tallow out of zone records\n",
+	"\t--verbose\t\tproduce more verbose output\n",
+	"\t--group=<name>\t\tassign new hosts to given group\n",
+	"\t--info=<user>:<dept>:<location>:<extra>\n",
+	"\t\t\t\tset info fields for all hosts\n",
+	"\t--force=<type>\t\tforce record type:\n",
+	"\t\t\t\t\tdhcp-only\n",
+	"\t--commit\t\tcommit changes (w/o this no changes are made)\n";
+  print "\n" if ($opt_help);
+  exit(0);
+}
+
+db_connect();
+
+$server=$ARGV[0];
+$zone=$ARGV[1];
+$filename=$ARGV[2];
+$gid=-1;
+$opt_noreverse = ($opt_noreverse ? 1 : 0);
+
+$serverid=get_server_id($server);
+fatal("cannot find server '$server'") unless ($serverid > 0);
+
+$zoneid=get_zone_id($zone,$serverid);
+fatal("cannot find zone '$zone'") unless ($zoneid > 0);
+
+fatal("cannot read file: $filename") unless (-r $filename);
+
+if ($opt_group) {
+  fatal("cannot find group '$opt_group'") 
+    if (($gid=get_group_by_name($serverid,$opt_group)) < 0);
+}
+
+if ($opt_info) {
+  @infof = split(/:/,$opt_info);
+  fatal("invalid paremeters for info option ") if (@infof > 4);
+}
+
+
+$force_type=0;
+if ($opt_force) {
+  if ($opt_force eq 'dhcp-only') {
+    $force_type=9;
+  }
+  else {
+    fatal("invalid parameters to option force");
+  }
+}
+
+$origin=$zone;
+$origin.="." unless ($zone =~ /\.$/);
+
+process_zonefile($filename,$origin,\%zonedata,1);
+
+$domains=keys(%zonedata);
+print "Found $domains domain(s) in zonefile: $filename\n";
+exit unless ($domains > 0);
+if ($opt_verbose) {
+  print "Testing mode no changes made to database.\n" unless ($opt_commit);
+  print "Processing only new records.\n" if ($opt_newonly);
+}
+
+db_begin();
+db_ignore_begin_and_commit(1);
+
+foreach $domain (sort keys %zonedata) {
+  $host=remove_origin($domain,$origin);
+  $rec=$zonedata{$domain};
+
+  if ($opt_name) {
+    next unless ($host =~ /$opt_name/);
+  }
+
+  undef @q;
+  db_query("SELECT id FROM hosts WHERE zone=$zoneid AND domain = '$host';",
+	   \@q);
+  if (($id=$q[0][0]) > 0) {
+    if ($opt_newonly) {
+      print "host: $host  SKIPPED: already exists (id=$id)\n"
+	if ($opt_verbose);
+      next;
+    }
+    print "host: $host  replacing (id=$id)\n";
+    fatal("cannot delete host record (id=$id)") if(delete_host($id) < 0);
+    $id=-1;
+  } else {
+    print  "host: $host  adding NEW\n";
+    $id=-1;
+  }
+
+  unless (@{$rec->{A}} > 0 || $rec->{CNAME} || @{$rec->{SRV}} > 0) {
+    print "unknown record type SKIPPED!\n";
+  }
+
+  unless ($id > 0) {
+    undef %host;
+    $new_type = ($rec->{CNAME} ? 4 : 1);
+    $new_type = 8 if (@{$rec->{SRV}} > 0);
+    $host{domain}=$host;
+    $host{type}=$new_type;
+    $host{zone}=$zoneid;
+    $id=add_host(\%host);
+    fatal("cannot insert host_record!") unless ($id > 0);
+  }
+
+  undef %host;
+  fatal("cannot get host record (id=$id)!") if (get_host($id,\%host));
+
+  $host{type}=$force_type if ($force_type > 0);
+  print " type: $host{type}\n" if ($opt_verbose);
+
+  $a=$rec->{A};
+  if ($host{type}==1) {
+    for $i (0..$#{$a}) {
+      print " IP: $$a[$i]\n" if ($opt_verbose);
+      push @{$host{ip}}, [0,$$a[$i],($opt_noreverse ? 'f':'t'),'t',2];
+    }
+  }
+  elsif ($host{type}==9) {
+    for $i (0..$#{$a}) {
+      print " DHCP IP: $$a[$i]\n" if ($opt_verbose);
+      push @{$host{ip}}, [0,$$a[$i],'f','f',2];
+    }
+  }
+  elsif ($host{type}==4) {
+    $aliasname=remove_origin($rec->{CNAME},$origin);
+    $aliasid=get_host_id($zoneid,$aliasname);
+    print " CNAME: $rec->{CNAME} ($aliasname) $aliasid \n";
+    $host{alias}=($aliasid > 0 ? $aliasid : -1);
+    $host{cname_txt}=$rec->{CNAME} unless ($aliasid > 0)
+  }
+  elsif ($host{type}==8) {
+    $a=$rec->{SRV};
+    for $i (0..$#{$a}) {
+      @l = split (/\s+/,$$a[$i]);
+      print "SRV: $l[0] $l[1] $l[2] $l[3]\n" if ($opt_verbose);
+      push @{$host{srv_l}}, [0, $l[0],$l[1],$l[2],$l[3],'',2];
+    }
+  }
+
+  if ($rec->{INFO}) {
+    print " info: $rec->{INFO}\n" if ($opt_verbose);
+    $host{info}=$rec->{INFO};
+  }
+
+  if ($rec->{ETHER}) {
+    print " ether: $rec->{ETHER}\n" if ($opt_verbose);
+    $host{ether}=$rec->{ETHER};
+  }
+
+  $host{huser}=$infof[0] if ($infof[0]);
+  $host{dept}=$infof[1] if ($infof[1]);
+  $host{location}=$infof[2] if ($infof[2]);
+  $host{info}=$infof[3] if ($infof[3]);
+  $host{grp}=$gid;
+
+  if (($res=update_host(\%host))<0) {
+    print db_errormsg()."\n";
+    fatal("cannot update host (id=$id) $res")
+  }
+}
+
+
+
+db_ignore_begin_and_commit(0);
+
+if ($opt_commit) {
+  fatal("cannot commit changes to database") if (db_commit() < 0);
+} else {
+  db_rollback();
+  print "NO CHANGES MADE!\n";
+}
+
+exit;
+
+
+# eof :-)
+

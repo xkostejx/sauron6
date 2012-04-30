@@ -1,0 +1,67 @@
+#!/usr/bin/perl -I/usr/local/sauron
+#
+# addgroup - utility to create users
+#
+# Copyright (c) Timo Kokkonen <tjko@iki.fi>  2000,2002.
+# $Id: addgroup,v 1.8 2003/12/28 19:29:11 tjko Exp $
+#
+require 5;
+use Getopt::Long;
+use Sauron::DB;
+use Sauron::Util;
+use Sauron::Sauron;
+
+load_config();
+
+GetOptions("help|h","name=s","group=s");
+
+if ($opt_help || $opt_help > 0) {
+  print "syntax: $0 [--help] [--group=name] [--name=\"<groupname>\"]\n";
+  exit(0);
+}
+
+db_connect();
+
+
+unless ($opt_group) {
+  print "Enter group name: ";
+  chomp ($opt_group = lc(<STDIN>));
+  $i=1;
+}
+fatal("Invalid groupname '$opt_group'!")
+  unless ($opt_group =~ /^[a-z0-9_\-]+$/);
+
+undef @q;
+db_query("SELECT id FROM user_groups WHERE name='$opt_group'",\@q);
+fatal("Group allready exists!") if ($q[0][0] > 0);
+
+unless ($opt_name) {
+  print "Enter group description: ";
+  chomp ($opt_name = <STDIN>);
+  $i=1;
+}
+
+
+if ($i) { # ask confirmation only in interactive session...
+  print "\t Groupname: $opt_group\n",
+  "\t Description: $opt_name\n",
+  "Add this group [y/n]?";
+
+  chomp ($t = <STDIN>);
+  unless ($t eq 'y' || $t eq 'Y') {
+    print "Group not added!\n";
+    exit(1);
+  }
+}
+
+
+$res=db_exec("INSERT INTO user_groups " .
+	     "(name,comment) VALUES('$opt_group','$opt_name');");
+
+fatal("Cannot add group: " .  db_errormsg()) if ($res < 0);
+
+print "Group $opt_group added succesfully.\n";
+exit;
+
+# eof :-)
+

@@ -1,0 +1,37 @@
+/* convert Sauron database format from 1.1 to 1.2 */
+/* (this requires PostgreSQL v7.3 or later) */
+
+
+/* settings */
+ALTER TABLE settings RENAME COLUMN key TO setting;
+
+/* nets */
+
+ALTER TABLE nets ADD COLUMN dummy BOOL;
+ALTER TABLE nets ALTER COLUMN dummy SET DEFAULT false;
+UPDATE nets SET dummy=false;
+
+/* servers */
+ALTER TABLE servers ADD COLUMN lastrun INT;
+ALTER TABLE servers ALTER COLUMN lastrun SET DEFAULT -1;
+
+/* hosts */
+
+ALTER TABLE hosts ADD COLUMN email TEXT;
+
+/* group_entries */
+
+CREATE TABLE group_entries (
+      id	   SERIAL PRIMARY KEY, /* unique ID */
+      host	   INT4 NOT NULL, /* ptr to hosts table id
+					-->hostss.id */
+      grp          INT4 NOT NULL  /* ptr to group (this host) belogs to
+					-->groups.id */
+);
+
+
+
+UPDATE settings SET value='1.2' where setting='dbversion';
+
+/* eof */
+

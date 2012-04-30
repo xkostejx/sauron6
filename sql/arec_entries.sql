@@ -1,0 +1,17 @@
+/* arec_entries table creation
+ *
+ * $Id: arec_entries.sql,v 1.4 2005/05/13 05:31:54 tjko Exp $
+ */
+
+/** pointers to A record aliased hosts, linked to a host record. **/
+
+CREATE TABLE arec_entries (
+      id	   SERIAL PRIMARY KEY, /* unique ID */
+      host	   INT4 NOT NULL, /* ptr to hosts table id
+					-->hosts.id */
+      arec         INT4 NOT NULL  /* ptr to aliased host id 
+					-->hosts.id */
+);
+
+CREATE INDEX arec_entries_host_index ON arec_entries (host);
+

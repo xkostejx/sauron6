@@ -1,0 +1,477 @@
+#!/usr/bin/perl -I/usr/local/sauron
+#
+# import-jyu - imports nonstandard records from .hosts files
+#
+# Copyright (c) Timo Kokkonen <tjko@iki.fi>  2000.
+# $Id: import-jyu,v 1.26 2003/12/28 19:29:12 tjko Exp $
+#
+# fileformat (similar to BIND Master File format):
+# {<domain>|@|<blank>} [<ignored (ttl)>] [<ignored (class)] <type> <rdata>
+#
+# records supported:
+#
+#     	type		data
+#	DHCP		<DHCP option>	
+#	ETHER		<MAC address>	
+#	ROUTER		{<network> <netmask>|DHCP option}
+#       PRINTER         <printtab stuff for printers>
+#       GROUP		<groupname>
+#       TYPE            <machine's model/type>
+#       SERIAL          <machine's serial no.>
+#       MUUTA[0-9]      <other information about machine>
+#
+require 5;
+use Net::Netmask;
+use Getopt::Std;
+use Sauron::DB;
+use Sauron::Util;
+use Sauron::UtilZone;
+use Sauron::BackEnd;
+use Sauron::Sauron;
+
+load_config();
+
+##############################
+
+getopts("hs");
+
+if (@ARGV != 3 || $opt_h) {
+    print "syntax: $0 [-h] <servername> <zone> <.hosts file>\n\n";
+    print "" if ($opt_h);
+    exit(1);
+}
+
+
+$servername = $ARGV[0];
+$zonename = $ARGV[1];
+$hostsfile = $ARGV[2];
+$user = (getpwuid($<))[0];
+$origin = "$zonename.";
+$cdate = time;
+
+db_connect();
+
+fatal("cannot open .hosts file ($hostsfile)") if (! -f $hostsfile);
+
+if ($hostsfile =~ /(^.*\/)/) {
+    $dir=$1;
+} else {
+    $dir="./";
+}
+
+print "server name: $servername\n";
+print "zone name: $zonename\norigin: $origin\n";
+print "directory: $dir\n";
+
+chdir($dir) || fatal("Cannot change to directory '$dir'!");
+
+###########################################################
+
+#get server record id
+$serverid = get_server_id($servername);
+fatal("Cannot find server record '$servername'!") if ($serverid < 1);
+
+
+#get zone record id
+$zoneid = get_zone_id($zonename,$serverid);
+fatal("Cannot find zone record '$zonename'!") if ($zoneid < 1);
+fatal("cannot get zone record") if (get_zone($zoneid,\%zonehash) < 0);
+fatal("Zone has to be normal master zone!")
+  if ($zonehash{type} ne 'M' || $zonehash{reverse} ne 'f');
+
+
+undef %zonedata;
+process_zonefile($hostsfile,$zonename,\%zonedata,1);
+
+$count = keys %zonedata;
+print "\nFound $count hosts...\n";
+
+db_begin();
+db_ignore_begin_and_commit(1);
+
+$rec = $zonedata{$origin};
+warn("No SOA record found in hosts file!") unless ($rec);
+
+# update zone record
+if ($rec) {
+  print "Updating zone/server specific stuff...\n";
+
+  foreach $rtmp (@{$rec->{DHCP}}) {
+    next if ($rtmp =~ /^\s*$/);
+    $res=db_exec("INSERT INTO dhcp_entries (type,ref,dhcp) " .
+		 "VALUES(1,$serverid,'$rtmp');");
+    die("cannot insert dhcp_entry '$rtmp' for server!") if ($res < 0);
+  }
+
+  delete $zonedata{$origin};
+}
+
+# find out-of-zone records
+foreach $host (keys %zonedata) {
+  $rec=$zonedata{$host};
+  next unless ($host eq remove_origin($host,$origin));
+  next if ($host =~ /\.in-addr\.arpa\.?$/);
+  next unless (@{$rec->{A}} > 0);
+
+  # skip ones that already are in database
+  next if (get_host_id($zoneid,$host) > 0);
+
+  print "out-of-zone: $host\n";
+
+  undef @q;
+  for $i (0..$#{$rec->{A}}) { push @q,[0,$rec->{A}[$i],'t','t']; }
+  fatal("cannot insert host $host!")
+    if (add_host({zone=>$zoneid,type=>1,domain=>$host,ip=>\@q}) < 0);
+
+  #delete $zonedata{$host};
+}
+
+
+
+# update AREC aliases
+foreach $host (keys %zonedata) {
+  $rec=$zonedata{$host};
+  next unless (@{$rec->{AREC}} > 0);
+  print "ARECs for $host :\n";
+
+  $arec_h=remove_origin($host,$origin);
+  $a_id = get_host_id($zoneid,$arec_h);
+  fatal("cannot get id for host $host!") unless ($a_id > 0);
+
+  for $i (0..$#{$rec->{AREC}}) {
+    $arec=$rec->{AREC}[$i];
+    print "\t$i $arec id=";
+    $id=get_host_id($zoneid,$arec);
+    print "$id ";
+    unless ($id > 0) { print "FAILED!\n"; next;  }
+    fatal("cannot delete A records for host id=$id!") 
+      if (db_exec("DELETE FROM a_entries WHERE host=$id;") < 0);
+    fatal("cannot update host record id=$id!")
+      if (db_exec("UPDATE hosts SET type=7 WHERE id=$id;") < 0);
+    fatal("cannot add AREC entry")
+      if (db_exec("INSERT INTO arec_entries (host,arec) VALUES($id,$a_id);")
+	  < 0);
+    print "OK\n";
+  }
+}
+
+
+# find virtual routers...
+
+foreach $host (keys %zonedata) {
+  $rec=$zonedata{$host};
+  if ($rec->{ROUTER} ne '') {
+    @router = split (" ",$rec->{ROUTER});
+
+    if (! $rhash{$router[0]}) {
+      $sqlstr = "UPDATE hosts SET router='1' WHERE zone=$zoneid " .
+	"AND domain='" . remove_origin($host,$origin) . "';";
+      $res = db_exec($sqlstr);
+      fatal("Cannot update host record for router interface $host") 
+	if ($res<0);
+      print "no host found for router $host\n" if ($res != 1);
+
+      $rhash{$router[0]}={ MASK=>$router[1], NAME=>$host, VLAN=>$router[2]};
+      $rcount++;
+    } else {
+      $rec2=$rhash{$router[0]};
+      print "Duplicate router $rec2->{NAME} $router[0] vs. " .
+	    "$host $rec->{ROUTER} (ignoring latter)\n";
+      #die("fix it...");
+    }
+  }
+}
+
+$rc=keys %rhash;
+print "found $rcount virtual-routers/subnets...$rc\n";
+print "Adding nets...";
+
+foreach $net (keys %rhash) {
+  $rec=$rhash{$net};
+  $rec2=$zonedata{$rec->{NAME}};
+
+  $nm = new Net::Netmask($net,$rec->{MASK});
+  $n = $nm->desc();
+  $range1 = $nm->nth(1);
+  $range2 = $nm->nth(-2);
+
+  undef @q;
+  foreach $rtmp (@{$rec2->{DHCP}}) {
+    next if ($rtmp =~ /^\s*$/);
+    push @q, [0,$rtmp];
+  }
+  $res=add_net({server=>$serverid,net=>$n,comment=>$rec->{INFO},
+		subnet=>'true',no_dhcp=>'false',
+		range_start=>$range1,range_end=>$range2,dhcp_l=>\@q});
+  fatal("cannot add net record for '$n'") if ($res < 0);
+  print ".";
+  delete $zonedata{$rec->{NAME}};
+}
+print "\n";
+
+
+# delegated zones
+foreach $host (keys %zonedata) {
+  $rec = $zonedata{$host};
+  if (@{$rec->{NS}} > 0) {
+    #print "ns: $host\n";
+    delete $zonedata{$host};
+  }
+}
+
+# plain MX records
+foreach $host (keys %zonedata) {
+  $rec = $zonedata{$host};
+  if (@{$rec->{MX}} > 0 && @{$rec->{A}} < 1 && @{$rec->{DHCP}} < 1) {
+    #print "plain mx: $host\n";
+    delete $zonedata{$host};
+  }
+}
+
+
+
+# groups
+print "Creating groups...\n";
+
+foreach $host (keys %zonedata) { # find groups
+  $rec = $zonedata{$host};
+  if ($rec->{GROUP} ne '') {
+    $grouphash{$rec->{GROUP}}++;
+  }
+}
+foreach $group (keys %grouphash) {
+  print "group: $group\n";
+  $host=add_origin($group,$origin);
+  $rec=$zonedata{$host};
+  if (! $rec) {
+    $host="." . $host;
+    $rec=$zonedata{$host};
+  }
+  if (! $rec) {
+    warn("Cannot find group: $group ($host)!");
+    $comment='empty group';
+  } else {
+    $comment=$rec->{INFO};
+  }
+
+  undef @q1;
+  foreach $rtmp (@{$rec->{DHCP}}) {
+    next if ($rtmp =~ /^\s*$/);
+    push @q1, [0,$rtmp,''];
+  }
+  undef @q2;
+  foreach $rtmp (@{$rec->{PRINTER}}) {
+    next if ($rtmp =~ /^\s*$/);
+    push @q2, [0,$rtmp,''];
+  }
+
+  $res=add_group({server=>$serverid,name=>$group,type=>1,comment=>$comment,
+		  dhcp=>\@q1,printer=>\@q2});
+  fatal("cannot add group '$group' ($res)") if ($res < 0);
+  $groupidhash{$group}=$res;
+
+  delete $zonedata{$host};
+}
+
+# get group id's
+undef %grouphash;
+%grouphash=%groupidhash;
+#for $g (keys %grouphash) { print "$g $grouphash{$g}\n"; }
+
+
+
+# printer definitions
+undef %printerhash;
+
+foreach $host (keys %zonedata) {
+  $rec = $zonedata{$host};
+  if (@{$rec->{A}} < 1 && @{$rec->{PRINTER}} > 0 &&
+      @{$rec->{DHCP}} < 1) {
+
+    $printerhash{$host}=$rec;
+    $host2=remove_origin($host,$origin);
+    $info="$rec->{INFO}";
+    $group=$grouphash{$rec->{GROUP}};
+    $group=-1 if (! $group);
+
+    if ($host =~ /^\@\S+$/) {
+      undef @q;
+      db_query("SELECT id FROM printer_classes WHERE name='$host2';",\@q);
+      if (@q > 0) {
+	print "skipping printer class: $host2\n";
+      }
+      else {
+	$ptype=3;
+	print "printer class: $host2\n";
+	$sqlstr="INSERT INTO printer_classes " .
+	  "(cdate,cuser,name,comment) " .
+	    "VALUES($cdate,'$user','$host2','imported entry');";
+	if (db_exec($sqlstr) < 0) {
+	  die("cannot insert printer_class '$host2'") ;
+	  $lastid=-1;
+	} else {
+	  undef @q;
+	  db_query("SELECT id FROM printer_classes WHERE name='$host2'",\@q);
+	  die("Cannot get printer_class record id!") unless ($q[0][0] > 0);
+	  $lastid=$q[0][0];
+	}
+      }
+    } else {
+      $ptype=2;
+      print "printer: $host $rec->{GROUP}\n";
+      $sqlstr="INSERT INTO hosts " .
+	"(cdate,cuser,zone,type,domain,hinfo_hw,hinfo_sw," .
+	"info,comment,grp,prn) " .
+	"VALUES($cdate,'$user',$zoneid,5,'$host2','REMOTE-PRINTER'," .
+	"'POSTSCRIPT','$info','virtual printer entry'," .
+	"$group,true );";
+      if (db_exec($sqlstr) < 0) {
+	die("cannot insert virtual printer '$host2'");
+	$lastid=-1;
+      } else {
+	undef @q;
+	db_query("SELECT id FROM hosts WHERE zone=$zoneid AND " .
+		     " domain='$host2';",\@q);
+	die("Cannot get printer(host) record id!") unless ($q[0][0] > 0);
+	$lastid=$q[0][0];
+      }
+    }
+
+    foreach $rtmp (@{$rec->{PRINTER}}) {
+      next if ($rtmp =~ /^\s*$/);
+      $res=db_exec("INSERT INTO printer_entries (type,ref,printer) " .
+		   "VALUES($ptype,$lastid,'$rtmp');");
+      die("cannot insert printer_entry '$rtmp' for printer $host2!") 
+	if ($res < 0);
+    }
+
+    delete $zonedata{$host};
+  }
+}
+
+
+# build domainname<-->id hash
+undef @q;
+db_query("SELECT id,domain FROM hosts WHERE zone=$zoneid",\@q);
+fatal("cannot get host list!") unless (@q > 0);
+for $j (0..$#q) { $hostidhash{$q[$j][1]}=$q[$j][0]; }
+
+
+# hosts
+
+$j=0;
+$str='';
+foreach $host (keys %zonedata) {
+  $rec = $zonedata{$host};
+  if (@{$rec->{A}} > 0) {
+    $hostname = remove_origin($host,$origin);
+    $lastid=$hostidhash{$hostname};
+    if (! $lastid) {
+      warn("cannot find id for host $hostname in hostidhash!") ;
+      delete $zonedata{$host};
+      next;
+    }
+
+    $ether = ($rec->{ETHER} eq '' ? "NULL" : "'$rec->{ETHER}'");
+    $ether_alias = -1;
+    if ($rec->{ETHER2} ne '') {
+      $ether_alias=$hostidhash{$rec->{ETHER2}};
+      unless ($ether_alias > 0) {
+	warn("cannot find ETHER address for '$host' ETHER2 entry");
+	$ether_alias=-1;
+      }
+    }
+
+    foreach $rtmp (@{$rec->{DHCP}}) {
+      next if ($rtmp =~ /^\s*$/);
+      $res=db_exec("INSERT INTO dhcp_entries (type,ref,dhcp) " .
+		   "VALUES(3,$lastid,'$rtmp');");
+      die("cannot insert dhcp_entry '$rtmp' for $hostname ($id)!") 
+	if ($res < 0);
+    }
+
+    if (@{$rec->{PRINTER}} < 1) {
+      $prn='false';
+    } else {
+      $prn='true';
+      foreach $rtmp (@{$rec->{PRINTER}}) {
+	next if ($rtmp =~ /^\s*$/);
+	$res=db_exec("INSERT INTO printer_entries (type,ref,printer) " .
+		     "VALUES(2,$lastid,'$rtmp');");
+	die("cannot insert printer_entry '$rtmp' for $hostname ($id)!") 
+	  if ($res < 0);
+      }
+    }
+    $group=$grouphash{$rec->{GROUP}};
+    $group=-1 if (! $group);
+
+    #print "host: $host $hostname HW=$ether\n";
+    $serial='NULL';
+    $serial=db_encode_str($rec->{SERIAL}) if ($rec->{SERIAL} ne '');
+    $model='NULL';
+    $model=db_encode_str($rec->{TYPE}) if ($rec->{TYPE} ne '');
+    $muuta=db_encode_str(join(',',@{$rec->{MUUTA}}));
+    $muuta='NULL' if ($muuta eq '');
+    $info='NULL';
+    $info=db_encode_str($rec->{INFO}) if ($rec->{INFO} ne '');
+
+    $sqlstr = "UPDATE hosts SET ether=$ether, model=$model, serial=$serial, " .
+              "misc=$muuta, info=$info, grp=$group, prn=$prn, " .
+	      "ether_alias=$ether_alias " .
+		"WHERE id=$lastid;";
+#              "WHERE zone=$zoneid AND domain='$hostname';";
+    #print "$sqlstr\n";
+    $str.=$sqlstr . "\n";
+    $j++;
+    if ($j > 50) {
+      die("Cannot update host $host") if (db_exec($str) < 0);
+      $str='';
+      $j=0;
+      print STDERR ".";
+    }
+
+    delete $zonedata{$host};
+  }
+}
+if ($str ne '') {
+      die("Cannot update host $host") if (db_exec($str) < 0);
+      print STDERR "|";
+}
+print "\n";
+
+
+
+# show unprocessed records...
+foreach $host (keys %zonedata) {
+  $rec = $zonedata{$host};
+  #print "unprosessed: $host\n" if (@{$rec->{A}} < 1);
+
+  delete $zonedata{$host};
+}
+
+
+# tag printers...
+#undef @plist;
+#db_query("SELECT h.id FROM hosts h,zones z,groups g " .
+#	 "WHERE h.zone=z.id AND h.grp=g.id AND z.server=$serverid " .
+#	 "AND h.prn=false AND g.printer NOTNULL;",\@plist);
+#if (@plist > 0) {
+#  print "Tagging printers...\n";
+#
+#  for $i (0 .. $#plist) {
+#    die("cannot update host entry id=$plist[$i][0]")
+#      if (db_exec("UPDATE hosts SET prn=true WHERE id=$plist[$i][0];") < 0);
+#  }
+#}
+
+
+
+print "Commiting changes...\n";
+db_ignore_begin_and_commit(0);
+die("error commiting the changes!") if (db_commit() < 0);
+
+#print "Vacuuming dbase...\n";
+#db_vacuum();
+exit;
+
+# eof

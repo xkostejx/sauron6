@@ -1,0 +1,95 @@
+#!/usr/bin/perl -I/usr/local/sauron
+#
+# runsql - utility to run SQL code from files given as parameters
+#
+# Copyright (c) Timo Kokkonen <tjko@iki.fi>  2001-2003.
+# $Id: runsql,v 1.9 2003/12/28 19:29:12 tjko Exp $
+#
+require 5;
+use Getopt::Long;
+use Sauron::DB;
+use Sauron::Util;
+use Sauron::Sauron;
+
+load_config();
+
+##############################################
+
+GetOptions("help|h","verbose|v","notransaction|n");
+
+$count=@ARGV;
+
+if ($opt_help || $count < 1) {
+  print "syntax: $0 [--help] [--separate] <filename> [<filename> ...]\n\n";
+  print " Parameter descriptions: \n",
+        "   --notransaction  do not use transactions\n",
+        "   --verbose        display SQL code\n\n";
+  print "" if ($opt_help);
+  exit(0);
+}
+
+db_connect();
+db_debug(0);
+
+$opt_verbose = ($opt_verbose ? 1 : 0);
+
+db_begin() unless ($opt_notransaction);
+
+while ($filename=$ARGV[0]) {
+  shift;
+  unless (open(FILE,$filename)) {
+    error("cannot open file: $filename");
+    next;
+  }
+  print "Processing file: $filename\n" if ($opt_verbose);
+  $comment=0;
+  $cmd='';
+
+  while(<FILE>) {
+  fileloop:
+    s/\s*$//;
+    s/\/\*.*\*\///;
+    if (/(\/\*.*$)/) {
+      #print "comment start: '$1'\n";
+      $comment=1;
+      s/\/\*.*$//;
+    } elsif (/(^.*\*\/)/) {
+      #print "comment end: '$1'\n";
+      $comment=0;
+      s/^.*\*\///;
+    } elsif ($comment) { 
+      next; 
+    }
+    next if (/^\s*$/);
+
+    if (/(^.*?;)/) {
+      $last=$1;
+      $cmd .= $last;
+      $cmd =~ s/^\s+//;
+      unless ($cmd =~ /^\s*$/) {
+	print "command: '$cmd'\n" if ($opt_verbose);
+	$res = db_exec($cmd);
+	if ($res < 0) {
+	  error("SQL command failed at $filename($.) : " . db_errormsg());
+	  exit(1) unless($opt_notransaction);
+	}
+      }
+      $cmd='';
+      s/(^.*?;)//;
+      goto fileloop;
+    }	
+
+    #print "   $_\n" if ($opt_verbose);
+    s/\s+/ /g;
+    $cmd .= $_;
+  }
+
+  close(FILE);
+}
+
+unless ($opt_notransaction) {
+  fatal("cannot changes to database!") if (db_commit() < 0);
+}
+
+exit;
+
