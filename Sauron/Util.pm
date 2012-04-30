@@ -9,6 +9,7 @@ use Time::Local 'timelocal_nocheck';
 use Digest::MD5;
 use Net::Netmask;
 use POSIX qw(strftime);
+use Net::IP;
 use strict;
 use vars qw($VERSION @ISA @EXPORT);
 
@@ -150,19 +151,8 @@ sub valid_texthandle($) {
 # check if parameter contains a valid CIDR...returns 0 if not.
 sub is_cidr($) {
   my($cidr) = @_;
-
-  my @base;
-
-  return 0 unless ( ( @base = ($cidr =~ /^(\d{1,3})(\.(\d{1,3}))?(\.(\d{1,3}))?(\.(\d{1,3}))?(\/(\d{1,2}))?$/)[0,2,4,6,8] ) );
-
-  return 0 if ($base[3] eq '' && $base[4] eq '');
-  return 0 unless ( ( $base[0] >= 0 && $base[0] <= 255) &&
-		    ( $base[1] >= 0 && $base[1] <= 255) &&
-		    ( $base[2] >= 0 && $base[2] <= 255) &&
-		    ( $base[3] >= 0 && $base[3] <= 255) &&
-		    ( $base[4] >= 0 && $base[4] <= 32) );
-
-  return 1;
+  
+  return (new Net::IP($cidr) ? 1 : 0);
 }
 
 sub is_ip($) {
