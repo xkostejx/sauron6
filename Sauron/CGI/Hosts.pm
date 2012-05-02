@@ -13,6 +13,10 @@ use Sauron::BackEnd;
 use Sauron::Util;
 use Sauron::Sauron;
 use Sauron::CGI::Utils;
+use Sys::Syslog qw(:DEFAULT setlogsock);
+Sys::Syslog::setlogsock('unix');
+use Data::Dumper;
+use Net::IP qw(:PROC);
 use strict;
 use vars qw($VERSION @ISA @EXPORT);
 
@@ -21,6 +25,18 @@ $VERSION = '$Id: Hosts.pm,v 1.24 2008/08/25 07:04:11 tjko Exp $ ';
 @ISA = qw(Exporter); # Inherit from Exporter
 @EXPORT = qw(
 	    );
+
+
+sub write2log{
+  my $msg       = shift;
+  my $filename  = File::Basename::basename($0);
+
+  Sys::Syslog::openlog($filename, "cons,pid", "debug");
+  Sys::Syslog::syslog("info", "$msg");
+  Sys::Syslog::closelog();
+} # End of write2log
+
+
 
 my $hinfo_addempty_mode = (defined($main::SAURON_HINFO_MODE) ?
 			   $main::SAURON_HINFO_MODE : 1);
@@ -530,7 +546,12 @@ sub menu_handler {
       update_history($state->{uid},$state->{sid},1,
 		    "DELETE: $host_types{$host{type}} ",
 		    "domain: $host{domain}, ip:$host{ip}[1][1], " .
-		    "ether: $host{ether}",$host{id});
+		    "ether: $host{ether}",$host{id}) if ip_is_ipv4($host{ip}[1][1]);
+      update_history($state->{uid},$state->{sid},1,
+		    "DELETE: $host_types{$host{type}} ",
+		    "domain: $host{domain}, ip:$host{ip}[1][1], " .
+		    "duid: $host{duid}",$host{id}) if ip_is_ipv6($host{ip}[1][1]);
+
     }
     return;
   }
@@ -793,6 +814,8 @@ sub menu_handler {
 			      "domain: $oldhost{domain} --> $host{domain} ") .
 			     ($host{ether} ne $oldhost{ether} ?
 			      "ether: $oldhost{ether} --> $host{ether} ":"") .
+			     ($host{duid} ne $oldhost{duid} ?
+			      "DUID: $oldhost{duid} --> $host{duid} ":"") .
 			     ($host{ip}[1][1] ne $old_ips[1] ?
 			      "ip: $old_ips[1] --> $host{ip}[1][1] ":""),
 			     $host{id});
@@ -1035,7 +1058,7 @@ sub menu_handler {
 
     undef @q;
     my $fields="a.id,a.type,a.domain,a.ether,a.info,a.huser,a.dept," .
-	    "a.location,a.expiration,a.ether_alias";
+	    "a.location,a.expiration,a.ether_alias, a.duid";
     $fields.=",a.cdate,a.mdate,a.expiration,a.dhcp_date," .
              "a.hinfo_hw,a.hinfo_sw,a.model,a.serial,a.misc,a.asset_id"
 	       if (param('csv'));
@@ -1060,6 +1083,8 @@ sub menu_handler {
     else { $sql="$sql1 ORDER BY $sorder,1"; }
     $sql.=" LIMIT $limit OFFSET $offset;" unless (param('csv'));
     #print "<br>$sql";
+    
+
     db_query($sql,\@q);
     my $count=scalar @q;
     if ($count < 1) {
@@ -1070,7 +1095,7 @@ sub menu_handler {
     #print "\n",url(-path_info=>1,-query=>1),"\n";
 
     if (param('csv')) {
-      printf print_csv(['Domain','Type','IP','Ether','User','Dept.',
+      printf print_csv(['Domain','Type','IP','Ether','DUID', 'User','Dept.',
 	                 'Location','Info','Hardware','Software',
 			 'Model','Serial','Misc','AssetID',
 			 'cdate','mdate','edate','dhcpdate'],1) . "\n";
@@ -1081,13 +1106,13 @@ sub menu_handler {
 	$q[$i][5]=dhcpether($q[$i][5])
 	  unless (dhcpether($q[$i][5]) eq '00:00:00:00:00:00');
 	printf print_csv([ $q[$i][4],$host_types{$q[$i][3]},$q[$i][0],
-	                   $q[$i][5],$q[$i][7],$q[$i][8],$q[$i][9],
-			   $q[$i][6],$q[$i][16],$q[$i][17],
-			   $q[$i][18],$q[$i][19],$q[$i][20],$q[$i][21],
-			   utimefmt($q[$i][12],$csv_fmt),
+	                   $q[$i][5],$q[$i][12], $q[$i][7],$q[$i][8],$q[$i][9],
+			   $q[$i][6],$q[$i][17],$q[$i][18],
+			   $q[$i][19],$q[$i][20],$q[$i][21],$q[$i][22],
 			   utimefmt($q[$i][13],$csv_fmt),
 			   utimefmt($q[$i][14],$csv_fmt),
-			   utimefmt($q[$i][15],$csv_fmt)
+			   utimefmt($q[$i][15],$csv_fmt),
+			   utimefmt($q[$i][16],$csv_fmt)
 			 ],1) . "\n";
       }
 
@@ -1147,6 +1172,7 @@ sub menu_handler {
 	  'Type',
 	  "<a href=\"$sorturl&bh_order=2\">IP</a>",
 	  "<a href=\"$sorturl&bh_order=3\">Ether</a>",
+	  "<a href=\"$sorturl&bh_order=5\">DUID</a>",
 	  "<a href=\"$sorturl&bh_order=4\">Info</a>"]);
 
     for $i (0..$#q) {
@@ -1159,6 +1185,9 @@ sub menu_handler {
       # $ether =~  s/^(..)(..)(..)(..)(..)(..)$/\1:\2:\3:\4:\5:\6/;
       $ether='<font color="#009900">ALIASED</font>' if ($q[$i][11] > 0);
       $ether='<font color="#990000">N/A</a>' unless($ether);
+      my $duid = $q[$i][12];
+      $duid = '<font color="#990000">N/A</a>' unless($duid);
+      
       my $hostname="<A HREF=\"$selfurl?menu=hosts&h_id=$q[$i][2]\">".
 	        "$q[$i][4]</A>";
       my $info = join_strings(', ',(@{$q[$i]})[6,7,8,9]);
@@ -1185,6 +1214,7 @@ sub menu_handler {
 	    td([$nro, $hostname,
 		"<FONT size=-1>$host_types{$q[$i][3]}</FONT>",$ip,
 	        "<font size=-3 face=\"courier\">$ether&nbsp;</font>",
+	        "<font size=-3 face=\"courier\">$duid&nbsp;</font>",
 	        "<FONT size=-1>".$info."&nbsp;</FONT>"]),"</TR>";
 
     }
@@ -1355,7 +1385,9 @@ sub menu_handler {
 	    $data{expiration}=$tmp
 	      unless ($data{expiration} > 0 && $data{expiration} < $tmp)
 	  }
-	  $res=add_host(\%data);
+	  
+	  write2log(Dumper(\%data));
+          $res=add_host(\%data);
 	  if ($res > 0) {
 	    update_history($state->{uid},$state->{sid},1,
 			   "ADD: $host_types{$data{type}} ",
@@ -1373,7 +1405,16 @@ sub menu_handler {
 		print "Conflicting host: ",
   	          "<a href=\"$selfurl?menu=hosts&h_id=$q[0][0]\">$q[0][1]</a>";
 	      }
-	    } else {
+	    } elsif(db_lasterrormsg() =~ /duid_key/) {
+              alert2("Duplicate DUID $data{duid}");
+              db_query("SELECT id,domain FROM hosts " .
+                       "WHERE duid='$data{duid}' AND zone=$zoneid",\@q);
+              if ($q[0][0] > 0) {
+                print "Conflicting host: ",
+                  "<a href=\"$selfurl?menu=hosts&h_id=$q[0][0]\">$q[0][1]</a>";
+              }
+            }
+		else {
 	      alert2(db_lasterrormsg());
 	    }
 	  }

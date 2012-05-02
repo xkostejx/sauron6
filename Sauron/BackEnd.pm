@@ -158,6 +158,8 @@ $VERSION = '$Id: BackEnd.pm,v 1.73 2008/03/31 08:43:32 tjko Exp $ ';
 
 my($muser);
 
+
+
 sub write2log
 {
   #my $priority  = shift;
@@ -590,6 +592,8 @@ sub add_record_sql($$) {
     $flag=1 unless ($flag);
   }
   $sqlstr.=")";
+ 
+  write2log($sqlstr);
 
   return $sqlstr;
 }
@@ -1680,7 +1684,7 @@ sub get_host($$) {
 	       "hinfo_hw,hinfo_sw,wks,mx,rp_mbox,rp_txt,router," .
 	       "prn,ether,ether_alias,info,location,dept,huser,model," .
 	       "serial,misc,cdate,cuser,muser,mdate,comment,dhcp_date," .
-	       "expiration,asset_id,dhcp_info,flags,email",
+	       "expiration,asset_id,dhcp_info,flags,email,duid",
 	       $id,$rec,"id");
   return -1 if ($res < 0);
   fix_bools($rec,"prn");

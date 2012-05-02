@@ -43,7 +43,8 @@ my($CGI_UTIL_zoneid,$CGI_UTIL_zone);
 my($CGI_UTIL_serverid,$CGI_UTIL_server);
 
 my %aml_type_hash = (0=>'CIDR',1=>'ACL',2=>'Key');
-our $chckInetFamily = undef;
+our $inetFamily4 = undef;
+our $inetFamily6 = undef;
 
 sub cgi_util_set_zone($$) {
   my ($id,$name) = @_;
@@ -138,7 +139,9 @@ sub form_check_field($$$) {
     return 'valid pathname required!'
       unless ($value =~ /^(|\S+\/)$/);
   } elsif ($type eq 'ip') {
-      $chckInetFamily = ip_get_version($value);
+      my $inetFamily = ip_get_version($value);
+      $inetFamily4 = 1 if $inetFamily == 4;
+      $inetFamily6 = 1 if $inetFamily == 6;
       return 'valid IP number required!' unless is_cidr($value);
   } elsif ($type eq 'cidr') {
     return 'valid CIDR (IP) required!' unless (is_cidr($value));
@@ -169,8 +172,9 @@ sub form_check_field($$$) {
   } elsif ($type eq 'bool') {
     return 'boolean value required!' unless ($value =~ /^(t|f)$/);
   } elsif ($type eq 'mac') {
-    return 'Ethernet address required!' if ($value !~ /^([0-9A-F]{12})$/ and $chckInetFamily == 4);
-    return 'Valid DUID required!' if ($value !~ /^([0-9A-F]{4})$/ and $chckInetFamily == 6);
+    return 'Ethernet address required!' if ($value !~ /^([0-9A-F]{12})$/ and $inetFamily4);
+  } elsif ($type eq 'duid') {
+    return 'Valid DUID required!' if ($value !~ /^([0-9A-F]{4})$/ and $inetFamily6);
   } elsif ($type eq 'printer_class') {
     return 'Valid printer class name required!'
       unless ($value =~ /^\@[a-zA-Z]+$/);
@@ -257,7 +261,7 @@ sub form_check_form($$$) {
     #print "<br>check $p,$type";
 
     if ($type == 1) {
-      if ($rec->{type} eq 'mac') {
+      if ($rec->{type} eq 'mac' or $rec->{type} eq 'duid') {
 	$val="\U$val";
 	$val =~ s/[\s:\-\.]//g;
       } elsif ($rec->{type} eq 'textarea') {
