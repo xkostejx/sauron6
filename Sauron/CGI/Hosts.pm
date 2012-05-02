@@ -1007,6 +1007,7 @@ sub menu_handler {
     if (param('bh_order') == 1) { $sorder='5,1';  }
     elsif (param('bh_order') == 3) { $sorder='6,1'; }
     elsif (param('bh_order') == 4) { $sorder='7,8,1'; }
+    elsif (param('bh_order') == 5) { $sorder='13,1'; }
     else { $sorder='1,5'; }
 
     #if (param('bh_cidr') || param('bh_net') ne 'ANY') {
