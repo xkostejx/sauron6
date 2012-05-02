@@ -1,4 +1,4 @@
-#!/usr/bin/perl -I/usr/local/sauron
+#!/usr/bin/perl  -I/usr/local/sauron
 #
 # generatehosts - utility to add host records
 #
@@ -12,6 +12,7 @@ use Sauron::DB;
 use Sauron::Util;
 use Sauron::BackEnd;
 use Sauron::Sauron;
+use Net::IP qw(:PROC);
 
 load_config();
 
@@ -33,6 +34,16 @@ sub tag_expand($) {
     $ip2=sprintf("%03d",$2);
     $ip3=sprintf("%03d",$3);
     $ip4=sprintf("%03d",$4);
+    $str=~ s/:IP1:/$ip1/g;
+    $str=~ s/:IP2:/$ip2/g;
+    $str=~ s/:IP3:/$ip3/g;
+    $str=~ s/:IP4:/$ip4/g;
+  }
+  elsif ($ip =~ /^([0-9a-fA-F]{4}\:){4}([0-9a-fA-F]{4})\:([0-9a-fA-F]{4})\:([0-9a-fA-F]{4})\:([0-9a-fA-F]{4})$/) {
+    $ip1=sprintf("%04s",$2);
+    $ip2=sprintf("%04s",$3);
+    $ip3=sprintf("%04s",$4);
+    $ip4=sprintf("%04s",$5);
     $str=~ s/:IP1:/$ip1/g;
     $str=~ s/:IP2:/$ip2/g;
     $str=~ s/:IP3:/$ip3/g;
@@ -116,29 +127,33 @@ fatal("invalid 'hostname' parameter: '$hostname'")
 	  unless ($hostname =~ /^\S+$/);
 fatal("invalid 'starting-IP' parameter: $startip") unless (is_cidr($startip));
 
-$sip = ip2int($startip);
-$eip = int($sip + $count -1);
 
+my $range = new Net::IP("$startip + " . ($count - 1)) or fatal("cannot create range variable");
 
 $origin=$zone;
 $origin.="." unless ($zone =~ /\.$/);
 
-print "IP range: ".int2ip($sip)." - ".int2ip($eip)."\n" if ($opt_verbose);
+my $family = (ip_is_ipv4($startip) ? 4 : 6);
+print "IP range: " . $startip . " - ". ip_compress_address($range->last_ip(), $family) . "\n" if ($opt_verbose);
 
 
 db_begin();
 db_ignore_begin_and_commit(1);
 
-foreach $i (0..$count-1) {
-  $ip=int2ip($sip+$i);
+$i = 0;
+
+do {
+  $ip = $range->ip();
+  $ip_c = ip_compress_address($range->ip(), $family);
   $domain=tag_expand($hostname);
   $host=remove_origin($domain,$origin);
-  print "$host : $ip\n";
+  
+  print "$host : " . $ip_c . " \n";
 
   undef @q;
   db_query("SELECT id FROM hosts WHERE zone=$zoneid AND domain = '$host';",
 	   \@q);
-  if (($id=$q[0][0]) > 0) {
+  if (defined $q[0][0] and ($id=$q[0][0]) > 0) {
     fatal("host: $host already exists!");
   }
 
@@ -147,7 +162,7 @@ foreach $i (0..$count-1) {
   $host{type}=1;
   $host{zone}=$zoneid;
   $host{grp}=$gid;
-  $host{ip}=[[0,$ip,'t',($opt_noreverse ? 'f' : 't')]];
+  $host{ip}=[[0,$ip_c,'t',($opt_noreverse ? 'f' : 't')]];
   $host{huser}=tag_expand($infof[0]) if ($infof[0]);
   $host{dept}=tag_expand($infof[1]) if($infof[1]);
   $host{location}=tag_expand($infof[2]) if($infof[2]);
@@ -155,8 +170,10 @@ foreach $i (0..$count-1) {
 
   $id=add_host(\%host);
   fatal("cannot insert host_record! $id") unless ($id > 0);
-  $add_count++;
-}
+  $add_count++; 
+  $i++;
+
+} while (++$range);
 
 
 
