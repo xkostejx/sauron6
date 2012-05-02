@@ -394,12 +394,12 @@ my %csv_timestamp=(1=>'Unix [epoch]',2=>'Standard [US]',
 my @csv_timestamp_f=('epoch','us-std','excel','iso8601:2004','rfc822date');
 
 my %browse_page_size=(0=>'25',1=>'50',2=>'100',3=>'256',4=>'512',5=>'1000');
-my %browse_search_fields=(0=>'Ether',1=>'Info',2=>'User',3=>'Location',
+my %browse_search_fields=(0=>'Ether',9=>'DUID',1=>'Info',2=>'User',3=>'Location',
 			  4=>'Department',5=>'Model',6=>'Serial',7=>'Misc',
 			  8=>'Asset ID',
 			  -1=>'<ANY>');
 my @browse_search_f=('ether','info','huser','location','dept','model',
-		  'serial','misc','asset_id');
+		  'serial','misc','asset_id','duid');
 my %browse_search_datefields=(0=>'Last lease (DHCP)',1=>'Last seen (DHCP)',
 			      2=>'Creation',3=>'Modification',4=>'Expiration');
 my @browse_search_df=('dhcp_date','dhcp_last','cdate','mdate','expiration');
@@ -1026,6 +1026,14 @@ sub menu_handler {
 	  if (param('bh_pattern') =~ /[^A-Fa-f0-9:\-\ ]/);
 	#print "<br>ether=$tmp2";
       }
+      elsif ($tmp eq 'duid') {
+	$tmp2 = "\U$tmp2";
+	$tmp2 =~ s/[^0-9A-F]//g;
+	print "Searching for DUID pattern '$tmp2'<br><br>"
+	  if (param('bh_pattern') =~ /[^A-Fa-f0-9:\-\ ]/);
+	#print "<br>ether=$tmp2";
+      }
+
       $tmp2=db_encode_str($tmp2);
       if ($tmp) {
 	$extrarule=" AND a.$tmp ~* $tmp2 ";
