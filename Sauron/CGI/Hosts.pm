@@ -754,7 +754,12 @@ sub menu_handler {
       my $update_ok;
       my %oldhost=%host;
       my @old_ips;
+      my $useInet4 = 0;
+      my $useInet6 = 0;      
+
+      
       for $i (1..$#{$host{ip}}) { $old_ips[$i]=$host{ip}[$i][1]; }
+      
       unless (($res=form_check_form('h',\%host,$hform))) {
 	if (check_perms('host',$host{domain},1)) {
 	  alert2("Invalid hostname: does not conform to your restrictions");
@@ -792,6 +797,17 @@ sub menu_handler {
 	    } else {
 	      $host{ether_alias}=-1;
 	    }
+	  }
+	
+	  for $i (1..$#{$host{ip}}) { 
+                $useInet4 = 1 if ip_is_ipv4($host{ip}[$i][1]) and param("h_ip_".$i."_del") ne "on";
+		$useInet6 = 1 if ip_is_ipv6($host{ip}[$i][1]) and param("h_ip_".$i."_del") ne "on";
+      	  }
+
+	
+	  if($useInet6 == 0 and $host{duid} ne ""){
+	  	alert2("IPv6 address not set -> empty DUID required!");
+                $update_ok = 0;
 	  }
 
 	  if ($update_ok) {

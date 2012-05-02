@@ -171,9 +171,10 @@ sub form_check_field($$$) {
     return 'port number required!' unless ($value > 0 && $value < 65535);
   } elsif ($type eq 'bool') {
     return 'boolean value required!' unless ($value =~ /^(t|f)$/);
-  } elsif ($type eq 'mac') {
+  } elsif ($type eq 'mac') { 
     return 'Ethernet address required!' if ($value !~ /^([0-9A-F]{12})$/ and $inetFamily4);
   } elsif ($type eq 'duid') {
+   # return 'IPv6 address not set -> empty DUID required!' if ($value ne "" and not defined $inetFamily6);
     return 'Valid DUID required!' if ($value !~ /^([0-9A-F]{4})$/ and $inetFamily6);
   } elsif ($type eq 'printer_class') {
     return 'Valid printer class name required!'
