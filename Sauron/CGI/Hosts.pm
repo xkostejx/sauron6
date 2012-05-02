@@ -68,13 +68,14 @@ my %host_form = (
   {ftype=>101, tag=>'hinfo_sw', name=>'HINFO software', type=>'hinfo',len=>25,
    sql=>"SELECT hinfo FROM hinfo_templates WHERE type=1 ORDER BY pri,hinfo;",
    addempty=>$hinfo_addempty_mode, empty=>1, iff=>['type','[19]']},
-  {ftype=>1, tag=>'ether', name=>'Ethernet address', type=>'mac', len=>40,
+  {ftype=>1, tag=>'ether', name=>'Ethernet address', type=>'mac', len=>17,
    conv=>'U', iff=>['type','([19]|101)'], empty=>1},
   {ftype=>4, tag=>'card_info', name=>'Card manufacturer',
    iff=>['type','[19]']},
   {ftype=>1, tag=>'ether_alias_info', name=>'Ethernet alias', no_empty=>1,
    empty=>1, type=>'domain', len=>30, iff=>['type','1'] },
-
+  {ftype=>1, tag=>'duid', name=>'DUID', type=>'duid', len=>40,
+   conv=>'U', iff=>['type','([19]|101)'], empty=>1},
   {ftype=>1, tag=>'asset_id', name=>'Asset ID', type=>'text', len=>20,
    empty=>1, no_empty=>1, chr=>1, iff=>['type','1']},
   {ftype=>1, tag=>'model', name=>'Model', type=>'text', len=>50, empty=>1,
@@ -162,11 +163,17 @@ my %restricted_host_form = (
   {ftype=>101, tag=>'hinfo_sw', name=>'HINFO software', type=>'hinfo',len=>25,
    sql=>"SELECT hinfo FROM hinfo_templates WHERE type=1 ORDER BY pri,hinfo;",
    addempty=>$hinfo_addempty_mode, empty=>1, iff=>['type','[19]']},
-  {ftype=>1, tag=>'ether', name=>'Ethernet address', type=>'mac', len=>40,
+  {ftype=>1, tag=>'ether', name=>'Ethernet address', type=>'mac', len=>17,
    conv=>'U', iff=>['type','[19]'], iff2=>['ether_alias_info',''],
+   {ftype=>1, tag=>'duid', name=>'DUID', type=>'duid', len=>40,
+   conv=>'U', iff=>['type','([19]|101)'], empty=>1},
+
    empty=>$main::SAURON_RHF{ether}},
   {ftype=>1, tag=>'ether', name=>'Ethernet address', type=>'mac', len=>17,
    conv=>'U', iff=>['type','101'], iff2=>['ether_alias_info',''], empty=>1},
+   {ftype=>1, tag=>'duid', name=>'DUID', type=>'duid', len=>40,
+   conv=>'U', iff=>['type','([19]|101)'], empty=>1},
+
   {ftype=>4, tag=>'ether_alias_info', name=>'Ethernet alias',
    iff=>['type','1']},
 
@@ -253,8 +260,11 @@ my %new_host_form = (
   {ftype=>101, tag=>'hinfo_sw', name=>'HINFO software', type=>'hinfo',len=>20,
    sql=>"SELECT hinfo FROM hinfo_templates WHERE type=1 ORDER BY pri,hinfo;",
    addempty=>$hinfo_addempty_mode, empty=>1, iff=>['type','1']},
-  {ftype=>1, tag=>'ether', name=>'Ethernet address', type=>'mac', len=>40,
+  {ftype=>1, tag=>'ether', name=>'Ethernet address', type=>'mac', len=>17,
    conv=>'U', iff=>['type','(1|9|101)'], empty=>1},
+  {ftype=>1, tag=>'duid', name=>'DUID', type=>'duid', len=>40,
+   conv=>'U', iff=>['type','([19]|101)'], empty=>1},
+
 
   {ftype=>1, tag=>'asset_id', name=>'Asset ID', type=>'text', len=>20,
    empty=>1, no_empty=>1, chr=>1, iff=>['type','1']},
@@ -327,8 +337,11 @@ my %restricted_new_host_form = (
   {ftype=>101, tag=>'hinfo_sw', name=>'HINFO software', type=>'hinfo',len=>20,
    sql=>"SELECT hinfo FROM hinfo_templates WHERE type=1 ORDER BY pri,hinfo;",
    addempty=>$hinfo_addempty_mode, empty=>0, iff=>['type','1']},
-  {ftype=>1, tag=>'ether', name=>'Ethernet address', type=>'mac', len=>40,
+  {ftype=>1, tag=>'ether', name=>'Ethernet address', type=>'mac', len=>17,
    conv=>'U', iff=>['type','[19]'], empty=>$main::SAURON_RHF{ether}},
+  {ftype=>1, tag=>'duid', name=>'DUID', type=>'duid', len=>40,
+   conv=>'U', iff=>['type','([19]|101)'], empty=>1},
+
 
   {ftype=>1, tag=>'asset_id', name=>'Asset ID', type=>'text', len=>20,
    empty=>$main::SAURON_RHF{asset_id}, no_empty=>1, chr=>1, iff=>['type','1']},
