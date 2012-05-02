@@ -1369,8 +1369,9 @@ sub menu_handler {
       unless (($res=form_check_form('addhost',\%data,$newhostform))) {
 	if ($data{type}==1 && $data{net} ne 'MANUAL' &&
 	    not is_cidr($data{ip})) {
-	  my $tmpnet=new Net::Netmask($data{net});
-	  $ip=auto_address($serverid,$tmpnet->desc());
+	  #my $tmpnet=new Net::Netmask($data{net});
+	  #$ip=auto_address($serverid,$tmpnet->desc());
+	  $ip=auto_address($serverid,$data{net});
 	  unless (is_cidr($ip)) {
 	    logmsg("notice","auto_address($serverid,$data{net}) failed!");
 	    alert1("Cannot get free IP: $ip");

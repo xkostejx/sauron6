@@ -203,34 +203,68 @@ sub get_db_version() {
 
 sub auto_address($$) {
   my($serverid,$net) = @_;
-  my(@q,$s,$e,$i,$j,%h);
+  my(@q,$s,$e,$i,$j,%h, $family);
+
+  #return 'Invalid server id'  unless ($serverid > 0);
+  #return 'Invalid net'  unless (is_cidr($net));
+
+  #db_query("SELECT net,range_start,range_end FROM nets " .
+  #         "WHERE server=$serverid AND net = '$net';",\@q);
+  #return "No auto address range defined for this net: $net ".
+  #       "($q[0][0],$q[0][1],$q[0][2]) "
+  #         unless (is_cidr($q[0][1]) && is_cidr($q[0][2]));
+  #$s=ip2int($q[0][1]);
+  #$e=ip2int($q[0][2]);
+  #return 'Invalid auto address range' if ($s >= $e);
+
+  #undef @q;
+  #db_query("SELECT a.ip FROM hosts h, a_entries a, zones z " .
+  #         "WHERE z.server=$serverid AND h.zone=z.id AND a.host=h.id " .
+  #         " AND '$net' >> a.ip ORDER BY a.ip;",\@q);
+  #for $i (0..$#q) {
+  #  $j=ip2int($q[$i][0]);
+  #  next if ($j < 0 || $j < $s || $j > $e);
+  #  $h{$j}=$q[$i][0];
+  #  #print "<br>$q[$i][0]";
+  #}
+  #for $i (0..($e-$s)) {
+  #  #print "<br>$i " . int2ip($s+$i);
+  #  return int2ip($s+$i) unless ($h{($s+$i)});
+  #}
+
+  #return "No free addresses left";
 
   return 'Invalid server id'  unless ($serverid > 0);
   return 'Invalid net'  unless (is_cidr($net));
-
+  return 'Invalid ip ' unless ($family = new Net::IP($net)->version());
+  
   db_query("SELECT net,range_start,range_end FROM nets " .
 	   "WHERE server=$serverid AND net = '$net';",\@q);
   return "No auto address range defined for this net: $net ".
          "($q[0][0],$q[0][1],$q[0][2]) "
 	   unless (is_cidr($q[0][1]) && is_cidr($q[0][2]));
-  $s=ip2int($q[0][1]);
-  $e=ip2int($q[0][2]);
-  return 'Invalid auto address range' if ($s >= $e);
+  
+  
+  my $rangeIP = new Net::IP($q[0][1] . " - " . $q[0][2]) or return 'Invalid auto address range';
 
   undef @q;
   db_query("SELECT a.ip FROM hosts h, a_entries a, zones z " .
 	   "WHERE z.server=$serverid AND h.zone=z.id AND a.host=h.id " .
 	   " AND '$net' >> a.ip ORDER BY a.ip;",\@q);
-  for $i (0..$#q) {
-    $j=ip2int($q[$i][0]);
-    next if ($j < 0 || $j < $s || $j > $e);
-    $h{$j}=$q[$i][0];
-    #print "<br>$q[$i][0]";
-  }
-  for $i (0..($e-$s)) {
-    #print "<br>$i " . int2ip($s+$i);
-    return int2ip($s+$i) unless ($h{($s+$i)});
-  }
+  
+  my @usedIP;
+  push @usedIP, $_ foreach @q;
+
+  #Nasty use ip_compress_address due $ip->short() bug in IPv4 
+  do{
+	#skip IPv4 broadcast address
+	{
+        	last  if $family == 4 and $rangeIP->ip() eq $rangeIP->last_ip();
+	}
+	return ip_compress_address($rangeIP->ip(), $family) 
+	unless ( grep {$_->[0] eq ip_compress_address($rangeIP->ip(), $family)} @usedIP ) ;
+  } while (++$rangeIP);
+
 
   return "No free addresses left";
 }
@@ -252,7 +286,7 @@ sub next_free_ip($$)
 
   db_query("SELECT net FROM nets WHERE server=$serverid AND net >> '$ip' " .
 	   "ORDER BY masklen(net) DESC LIMIT 1",\@q);
-  return 'chyba' unless (@q > 0);
+  return '' unless (@q > 0);
   db_query("SELECT a.ip FROM hosts h , a_entries a, zones z " .
 	   "WHERE z.server=$serverid AND h.zone=z.id AND a.host=h.id " .
 	   " AND '$q[0][0]' >> a.ip ORDER BY a.ip;",\@ips);
@@ -268,8 +302,9 @@ sub next_free_ip($$)
   #Nasty use ip_compress_address due $ip->short() bug in IPv4 
   do{
 	#skip IPv4 broadcast address
-	return ''  if $family == 4 and $rangeIP->ip() eq $rangeIP->last_ip();
-
+	{
+  		last if $family == 4 and $rangeIP->ip() eq $rangeIP->last_ip();
+	}
 	return ip_compress_address($rangeIP->ip(), $family) 
 	unless ( grep {$_->[0] eq ip_compress_address($rangeIP->ip(), $family)} @usedIP ) ;
   } while (++$rangeIP);
