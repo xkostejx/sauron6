@@ -13,7 +13,7 @@ use Sauron::DB;
 use Sauron::Util;
 use Sauron::BackEnd;
 use Sauron::Sauron;
-
+use Net::IP;
 load_config();
 
 
@@ -100,8 +100,8 @@ if ($opt_edate) {
 print "Expiration date will be set to: ".localtime($etime)."\n";
 
 if ($opt_cidr) {
-  fatal("invalid CIDR: $cidr") unless (is_cidr($opt_cidr));
-  if ($opt_cidr =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(\/32)?$/) {
+  fatal("invalid CIDR: $opt_cidr") unless (is_cidr($opt_cidr));
+  if (new Net::IP($opt_cidr)->size() == 1) {
     $cidr .= " AND a.ip = '$opt_cidr' ";
   } else {
     $cidr.= " AND a.ip << '$opt_cidr' ";
@@ -117,7 +117,7 @@ if ($opt_netname) {
 	   \@nets);
   for $i (0..$#nets) {
     $net = $nets[$i][1];
-    next if ($net =~ /\/32$/);
+    next if (new Net::IP($net)->size());
 #    $tmpnet = new Net::Netmask($net);
 #    $nets[$i][3] = $tmpnet->nth(1) unless (is_cidr($nets[$i][3]));
 #    $nets[$i][4] = $tmpnet->nth(-2) unless (is_cidr($nets[$i][4]));
@@ -127,7 +127,7 @@ if ($opt_netname) {
            $net,$nets[$i][2],$nets[$i][3],$nets[$i][4] if ($opt_verbose);
     $netnames .= " OR " if ($netnames);
     $netnames .= " a.ip << '$net' ";
-    push @chklist, [ip2int($nets[$i][3]), ip2int($nets[$i][4])];
+    push @chklist, [new Net::IP($net[i][3])->intip(), new Net::IP($net[i][4])->intip()];
   }
 
   $netnames = " AND ($netnames) ";
@@ -165,7 +165,7 @@ for $i (0..$#q) {
   next if ($etheralias > 0);
   if ($opt_netname) {
     # skip hosts outside IP-ranges in chklist
-    $ipi=ip2int($ip);
+    $ipi = new Net::IP($ip)->intip();
     $ok=0;
     for $j (0..$#chklist) {
       if ($ipi >= $chklist[$j][0] && $ipi <= $chklist[$j][1]) {
