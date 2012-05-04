@@ -593,7 +593,8 @@ sub menu_handler {
         th("DHCP"),($novlans?'':th("VLAN")),th("Lvl"),"</TR>";
 
   my @path;
-  push @path, '0.0.0.0/0';
+ 
+  push @path, 0.0.0.0;
   my $listmode = param('list');
 
   for $i (0..$#q) {

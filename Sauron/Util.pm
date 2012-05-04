@@ -12,6 +12,20 @@ use POSIX qw(strftime);
 use Net::IP qw(:PROC);
 use strict;
 use vars qw($VERSION @ISA @EXPORT);
+use Sys::Syslog qw(:DEFAULT setlogsock);
+Sys::Syslog::setlogsock('unix');
+use Data::Dumper;
+
+
+sub write2log{
+  my $msg       = shift;
+  my $filename  = File::Basename::basename($0);
+   
+  Sys::Syslog::openlog($filename, "cons,pid", "debug");
+  Sys::Syslog::syslog("info", "$msg");
+  Sys::Syslog::closelog();
+} # End of write2log
+   
 
 $VERSION = '$Id: Util.pm,v 1.25 2009/02/05 09:28:30 tjko Exp $ ';
 
@@ -185,15 +199,15 @@ sub decode_cidr($$$) {
 sub is_cidr_within_cidr($$) {
     my($a,$b) = @_;
 
-    my($basea,$baseb,$maska,$maskb);
+    #return 1 unless $b;
+    
+    my $net_a = new Net::IP($a) or return -1;
+    my $net_b = new Net::IP($b) or return -2;
 
-    return -1 if (decode_cidr($a,\$basea,\$maska) < 0);
-    return -2 if (decode_cidr($b,\$baseb,\$maskb) < 0);
-
-    # let's test if CIDR a is within CIDR b...
-    return 0 unless ($maska > $maskb);
-    return ( ($basea & $maskb) == ($baseb & $maskb) ? 1 : 0);
+    return 0 unless (hex($net_a->hexmask()) > hex($net_b->hexmask()));
+    return ($net_a->overlaps($net_b) == $IP_A_IN_B_OVERLAP ? 1 : 0);
 }
+
 
 
 # convert in-addr.arpa format address into CIDR format address
