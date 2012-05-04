@@ -539,7 +539,7 @@ if (defined $opt_add) {
       $ref=-1;
     }
     elsif ($type==5) {
-      print "Enter IP mask (eg 192.162.1-2.*, 192.162.1-2.10-254): ";
+      print "Enter IP mask (eg 192.162.1-2.*, 192.162.1-2.10-254, 2001:db8:aa-ff:1428:a*c:57ab:*): ";
       chomp($tmp = <STDIN>);
       unless (check_ipmask($tmp,'')==1) {
 	  print "invalid IP-mask!\n"; goto add_i;
