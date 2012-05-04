@@ -67,8 +67,10 @@ while(<FILE>) {
     }
   }
   elsif ($opt_ip) {
-    next unless /((\d){1,3}\.(\d){1,3}\.(\d){1,3}\.(\d){1,3})/;
-    $ip=$1;
+    $ip = $_;
+    $ip =~ s/\s+//g; 
+    next unless is_cidr($ip);
+    
     print "IP=$ip ";
     db_query("SELECT h.id,h.domain FROM hosts h, zones z, a_entries a " .
 	     "WHERE z.server=$serverid AND h.zone=z.id AND a.host=h.id " .
