@@ -12,6 +12,8 @@ use Sauron::DB;
 use Sauron::Util;
 use Sauron::BackEnd;
 use Sauron::Sauron;
+use Net::IP qw(:PROC);
+
 
 load_config();
 
@@ -73,7 +75,7 @@ if ($opt_cidr || $opt_move) {
 
 if ($opt_cidr) {
   fatal("invalid CIDR: $cidr") unless (is_cidr($opt_cidr));
-  if ($opt_cidr =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(\/32)?$/) {
+  if (new Net::IP($opt_cidr)->size() == 1) {
     $cidr .= " AND a.ip = '$opt_cidr' ";
   } else {
     $cidr.= " AND a.ip << '$opt_cidr' ";
@@ -129,13 +131,16 @@ if ($opt_move) {
     unless ($opt_move =~ /^(\S+),(\S+)$/);
   $move_net=$1;
   $move_ip=$2;
+    
+  $m_net = new Net::IP($move_net) or print "nelze net\n";
+  $m_ip = new Net::IP($move_ip) or print "nelze ip\n";
+
   fatal("invalid CIDR parameter to option move: $move_net")
-    unless (is_cidr($move_net));
+    unless $m_net;
   fatal("invalid IP parameter to option move: $move_ip")
-    unless ($move_ip =~ /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/);
+    unless $m_ip;
   print "Move matching hosts to net $move_net starting from $move_ip\n";
-  $net=new Net::Netmask($move_net);
-  fatal("invalid parameters to option move")  unless ($net->match($move_ip));
+  fatal("invalid parameters to option move") if ($m_net->overlaps($m_ip) == $IP_NO_OVERLAP or $m_net->overlaps($m_ip) == undef);
 }
 
 if ($opt_rename) {
@@ -201,10 +206,13 @@ for $i (0..$#q) {
     print "\trename: $q[$i][1] --> $domain\n";
   }
   if ($opt_move) {
-    $new_ip=int2ip(ip2int($move_ip)+$ipcounter++);
-    while (ip_in_use($serverid,$new_ip) && $net->match($new_ip)) {
+    $m_net += ($m_ip->intip() - $m_net->intip());
+    $new_ip = ip_compress_address($m_net->ip(), $m_net->version());
+
+    while (ip_in_use($serverid,$new_ip)) {
       #print "\tSKIP ip: $new_ip\n";
-      $new_ip=int2ip(ip2int($move_ip)+$ipcounter++);
+      $m_net++; 
+      $new_ip = ip_compress_address($m_net->ip(), $m_net->version());
     }
     fatal("cannot find new ip!") if (ip_in_use($serverid,$new_ip));
     print "\tnew ip: $new_ip\n";
