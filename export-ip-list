@@ -33,7 +33,10 @@ if ($opt_help || @ARGV < 1) {
 #	"\t--inverse\t\tlist IPs not in use\n",
 	"\t--netsonly\tlist only matching (sub)nets\n",
 	"\t--optimize\tcombine continuous IP blocks into CIDRs\n",
-	"\t--verbose\tmore verbose output\n";
+	"\t--verbose\tmore verbose output\n",
+    "\t\n",
+    "*** Warning - output doesn't contain IPv6 subnets ***\n\n";
+
   print "\n" if ($opt_help);
   exit(0);
 }
@@ -59,7 +62,7 @@ print "# server: $servername\n# mask(s): ".join(",",@masks).
 my $netblocks = {};
 db_query("SELECT id,net,netname " .
 	 "FROM nets " .
-	 "WHERE server=$serverid AND dummy=false " .
+	 "WHERE server=$serverid AND dummy=false AND family(net) = 4 " .
 	 "ORDER BY net",\@allnets);
 
 for $i (0..$#allnets) {
