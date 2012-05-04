@@ -205,35 +205,6 @@ sub auto_address($$) {
   my($serverid,$net) = @_;
   my(@q,$s,$e,$i,$j,%h, $family);
 
-  #return 'Invalid server id'  unless ($serverid > 0);
-  #return 'Invalid net'  unless (is_cidr($net));
-
-  #db_query("SELECT net,range_start,range_end FROM nets " .
-  #         "WHERE server=$serverid AND net = '$net';",\@q);
-  #return "No auto address range defined for this net: $net ".
-  #       "($q[0][0],$q[0][1],$q[0][2]) "
-  #         unless (is_cidr($q[0][1]) && is_cidr($q[0][2]));
-  #$s=ip2int($q[0][1]);
-  #$e=ip2int($q[0][2]);
-  #return 'Invalid auto address range' if ($s >= $e);
-
-  #undef @q;
-  #db_query("SELECT a.ip FROM hosts h, a_entries a, zones z " .
-  #         "WHERE z.server=$serverid AND h.zone=z.id AND a.host=h.id " .
-  #         " AND '$net' >> a.ip ORDER BY a.ip;",\@q);
-  #for $i (0..$#q) {
-  #  $j=ip2int($q[$i][0]);
-  #  next if ($j < 0 || $j < $s || $j > $e);
-  #  $h{$j}=$q[$i][0];
-  #  #print "<br>$q[$i][0]";
-  #}
-  #for $i (0..($e-$s)) {
-  #  #print "<br>$i " . int2ip($s+$i);
-  #  return int2ip($s+$i) unless ($h{($s+$i)});
-  #}
-
-  #return "No free addresses left";
-
   return 'Invalid server id'  unless ($serverid > 0);
   return 'Invalid net'  unless (is_cidr($net));
   return 'Invalid ip ' unless ($family = new Net::IP($net)->version());
@@ -279,10 +250,10 @@ sub next_free_ip($$)
   return '' unless ($family = ip_get_version($ip));
 
   #First IP is network address
-  my $firstIPshift = 1;
+  #my $firstIPshift = 1;
   #UWB Pilsen has first IP ::1:0/112 => + 2^16 hosts
   #Need global config
-  $firstIPshift += 2 ** 16 if $family == 6;
+  #$firstIPshift += 2 ** 16 if $family == 6;
 
   db_query("SELECT net FROM nets WHERE server=$serverid AND net >> '$ip' " .
 	   "ORDER BY masklen(net) DESC LIMIT 1",\@q);
@@ -292,12 +263,14 @@ sub next_free_ip($$)
 	   " AND '$q[0][0]' >> a.ip ORDER BY a.ip;",\@ips);
 
   my $rangeIP = new Net::IP($q[0][0]) or return '';
- 
+  my $m_ip = new Net::IP($ip) or return '';
+
   my @usedIP;
   push @usedIP, $_ foreach @ips;
   
   #Skip network address + firstIPshift :]
-  $rangeIP += $firstIPshift;
+  #$rangeIP += $firstIPshift;
+  $rangeIP += ($m_ip->intip() - $rangeIP->intip() + 1);
 
   #Nasty use ip_compress_address due $ip->short() bug in IPv4 
   do{
