@@ -35,7 +35,7 @@ if ($opt_help || @ARGV < 1) {
 	"\t--optimize\tcombine continuous IP blocks into CIDRs\n",
 	"\t--verbose\tmore verbose output\n",
     "\t\n",
-    "*** Warning - output doesn't contain IPv6 subnets ***\n\n";
+    "*** Warning - optimized output doesn't contain IPv6 subnets ***\n\n";
 
   print "\n" if ($opt_help);
   exit(0);
@@ -62,7 +62,7 @@ print "# server: $servername\n# mask(s): ".join(",",@masks).
 my $netblocks = {};
 db_query("SELECT id,net,netname " .
 	 "FROM nets " .
-	 "WHERE server=$serverid AND dummy=false AND family(net) = 4 " .
+	 "WHERE server=$serverid AND dummy=false " .
 	 "ORDER BY net",\@allnets);
 
 for $i (0..$#allnets) {
@@ -79,8 +79,9 @@ for $i (0..$#allnets) {
 
   if ($match) {
     push @nets, $net;
-    my $block = new Net::Netmask($net);
-    $block->storeNetblock($netblocks);
+
+    my $block = new2 Net::Netmask($net);
+    $block->storeNetblock($netblocks) if defined $block;
   }
 }
 
