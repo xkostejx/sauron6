@@ -228,28 +228,53 @@ sub arpa2cidr($) {
       $range=int(log($range)/log(2));
   }
 
-  return '0.0.0.0/0' unless $arpa =~ 
-    /^(\d{1,3}\.)?(\d{1,3}\.)?(\d{1,3}\.)?(\d{1,3}\.)in-addr\.arpa/;
-  @m = (0,$1,$2,$3,$4);
+  if($arpa =~ /^(\d{1,3}\.)?(\d{1,3}\.)?(\d{1,3}\.)?(\d{1,3}\.)in-addr\.arpa/){
+    @m = (0,$1,$2,$3,$4);
 
-  $s=4;
-  for($i=4;$i>0;$i--) {
-    next if ($m[$i] eq '');
-    $cidr.=$m[$i];
-    $s--;
-  }
-  for($i=$s;$i>0;$i--) {
-    $cidr.='0.';
-  }
-  $cidr =~ s/\.$//g;
-  #print $s;
-  if ($range) { 
-    $s=32-$range; 
-  } else { 
-    $s=(32-($s*8)); 
-  }
+      $s=4;
+      for($i=4;$i>0;$i--) {
+        next if ($m[$i] eq '');
+        $cidr.=$m[$i];
+        $s--;
+      }
+      for($i=$s;$i>0;$i--) {
+        $cidr.='0.';
+      }
+      $cidr =~ s/\.$//g;
+      #print $s;
+      if ($range) { 
+        $s=32-$range; 
+      } else { 
+        $s=(32-($s*8)); 
+      }
 
-  return $cidr . "/" . $s;
+      return $cidr . "/" . $s;
+  }
+  elsif($arpa =~ /^(([a-fA-F0-9]\.){1,32})ip6\.(arpa|int)/){
+    my @nums  = split /\./, $1;
+    my $mask  = scalar @nums;
+    my $mask_b = $mask * 4;
+    my $index = 0;
+    my $cidr  = "";
+
+    foreach my $num (reverse @nums) {
+        $cidr .= $num;
+
+        if(++$index == 4) {
+            $cidr .= ":";
+            $index = 0;
+        }
+
+    }
+
+    $cidr .= "::" if ($mask < 32 and $mask % 4 != 0);
+    $cidr .= ":" if ($mask < 32 and $mask % 4 == 0);
+    chop($cidr) if $mask == 32;
+
+    return $cidr . "/" . $mask_b;
+  }
+  
+  return '0.0.0.0/0';
 }
 
 
