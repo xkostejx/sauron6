@@ -10,6 +10,11 @@ use Sauron::Util;
 use strict;
 use vars qw($VERSION @ISA @EXPORT);
 
+use Sys::Syslog qw(:DEFAULT setlogsock);
+Sys::Syslog::setlogsock('unix');
+use Data::Dumper;
+
+
 $VERSION = '$Id: DB-DBI.pm,v 1.6 2003/12/28 19:29:12 tjko Exp $ ';
 
 @ISA = qw(Exporter); # Inherit from Exporter
@@ -36,6 +41,16 @@ $VERSION = '$Id: DB-DBI.pm,v 1.6 2003/12/28 19:29:12 tjko Exp $ ';
 	     db_insert
 	    );
 
+sub write2log
+{
+  #my $priority  = shift;
+  my $msg       = shift;
+  my $filename  = File::Basename::basename($0);
+
+  Sys::Syslog::openlog($filename, "cons,pid", "debug");
+  Sys::Syslog::syslog("info", "$msg");
+  Sys::Syslog::closelog();
+} # End of write2log
 
 my $dbh = 0;
 my $db_last_result = 0;
@@ -77,6 +92,8 @@ sub db_exec($) {
 
   unless ($sth->execute()) {
     $db_last_error_msg=$dbh->errstr;
+    
+
     return -2;
   }
 
@@ -249,8 +266,6 @@ sub db_insert($$$) {
   my($table,$fields,$data) = @_;
   my($str,$i,$j,$c,$row,$flag,$res);
 
-
-  $c=0;
   for $i (0..$#{$data}) {
     $row=$$data[$i]; $flag=0;
     $str.="INSERT INTO $table ($fields) VALUES(";
@@ -260,14 +275,9 @@ sub db_insert($$$) {
       $flag=1;
     }
     $str.=");\n";
-    $c++;
-    if ($c > 25) {
-      $c=0;
-      #print "BLOCK: $str\n";
-      $res=db_exec($str);
-      return -1 if ($res < 0);
-      $str='';
-    }
+    $res=db_exec($str);
+    return -1 if ($res < 0);
+    $str='';
   }
 
   if ($str ne '') {
