@@ -207,11 +207,11 @@ if ($opt_help || ($opt_user eq '' &&  $opt_list eq '')) {
       unless ($modgroup);
 
   print "   --add=\"server,<servername>,<mode>\"    add server (mode=R|RW|RWX)\n",
-        "   --add=\"zone,<servername>:<zonename>,<mode>\"\n",
+        "   --add=\"zone,<servername>+<zonename>,<mode>\"\n",
         "                                         add zone (mode=R|RW|RWX)\n",
-        "   --add=\"net,<servername>:<net>\"        add net (CIDR)\n",
+        "   --add=\"net,<servername>+<net>\"        add net (CIDR)\n",
         "   --add=\"hostmask,<regex>\"              add global hostname mask\n",
-        "   --add=\"hostmask,<servername>:<zonename>,<regex>\"\n",
+        "   --add=\"hostmask,<servername>+<zonename>,<regex>\"\n",
         "                                         add zone-bound hostname mask\n",
         "   --add=\"ipmask,<ipmask>\"               add IP-mask\n",
         "   --add=\"level,<level>\"                 add priv.level\n",
@@ -220,7 +220,7 @@ if ($opt_help || ($opt_user eq '' &&  $opt_list eq '')) {
         "   --add=\"tmplmask,<regex>\"              add Template-mask\n",
         "   --add=\"grpmask,<regex>\"               add Group-mask\n",
         "   --add=\"delmask,<regex>\"               add global Host delete mask\n",
-        "   --add=\"delmask,<servername>:<zonename>,<regex>\"\n",
+        "   --add=\"delmask,<servername>+<zonename>,<regex>\"\n",
         "                                         add zone-bound delete mask\n",
         "   --add=\"rhf,<field>=0|1\"               add RequiredHostField-setting\n",
 	"   --add=\"flag,<name>\"                   add Privilege flag:\n",
@@ -632,7 +632,7 @@ if (defined $opt_add) {
   }
   elsif ($type==2) {
     fatal("bad mode \"$mode\"!") unless ($mode =~ /^(R|RW|RWX)$/);
-    if ($tmp=~/^(\S+):(\S+)$/) {
+    if ($tmp=~/^(\S+)\+(\S+)$/) {
       $tmp1=$1;
       $tmp2=$2;
       $serverid=get_server_id($tmp1);
@@ -648,9 +648,10 @@ if (defined $opt_add) {
   }
   elsif ($type==3) {
     fatal("bad mode \"$mode\"!") unless ($mode =~ /^$/);
-    if ($tmp=~/^(\S+):(\S+)$/) {
+    if ($tmp=~/^(\S+)\+(\S+)$/) {
       $tmp1=$1;
       $tmp2=$2;
+
       $serverid=get_server_id($tmp1);
       fatal("Cannot find server '$tmp1'") unless ($serverid > 0);
     } else {
@@ -666,7 +667,7 @@ if (defined $opt_add) {
   elsif ($type==4 || $type==11) {
     $mode = $tmp if ($mode =~ /^$/);
     fatal("bad mode \"$mode\"!") unless ($mode =~ /^\S+$/);
-    if ($tmp=~/^(\S+):(\S+)$/) {
+    if ($tmp=~/^(\S+)\+(\S+)$/) {
       $tmp1=$1;
       $tmp2=$2;
       $serverid=get_server_id($tmp1);
