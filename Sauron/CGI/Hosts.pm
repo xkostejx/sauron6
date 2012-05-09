@@ -1464,6 +1464,7 @@ sub menu_handler {
     %data=%host;
     delete $data{ip};
     delete $data{ether};
+    delete $data{duid};
     delete $data{serial};
     delete $data{asset_id};
     $data{ip}=$host{ip}[1][1];
