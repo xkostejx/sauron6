@@ -12,8 +12,22 @@ use Sauron::CGIutil;
 use Sauron::BackEnd;
 use Sauron::Sauron;
 use Sauron::CGI::Utils;
+use Net::IP qw(:PROC);
 use strict;
 use vars qw($VERSION @ISA @EXPORT);
+use Sys::Syslog qw(:DEFAULT setlogsock);
+Sys::Syslog::setlogsock('unix');
+use Data::Dumper;
+
+sub write2log{
+  my $msg       = shift;
+  my $filename  = File::Basename::basename($0);
+
+  Sys::Syslog::openlog($filename, "cons,pid", "debug");
+  Sys::Syslog::syslog("info", "$msg");
+  Sys::Syslog::closelog();
+} # End of write2log
+
 
 $VERSION = '$Id: Nets.pm,v 1.10 2008/08/25 07:06:08 tjko Exp $ ';
 
@@ -152,8 +166,29 @@ my %net_info_form=(
   {ftype=>1, tag=>'net', name=>'Net (CIDR)', type=>'cidr'},
   {ftype=>1, tag=>'base', name=>'Base', type=>'cidr'},
   {ftype=>1, tag=>'netmask', name=>'Netmask', type=>'cidr'},
-  {ftype=>1, tag=>'hostmask', name=>'Hostmask', type=>'cidr'},
+  #{ftype=>1, tag=>'hostmask', name=>'Hostmask', type=>'cidr'},
   {ftype=>1, tag=>'broadcast', name=>'Broadcast address', type=>'cidr'},
+  {ftype=>1, tag=>'size', name=>'Size', type=>'int'},
+  {ftype=>0, name=>'Usable address range'},
+  {ftype=>1, tag=>'first', name=>'Start', type=>'int'},
+  {ftype=>1, tag=>'last', name=>'End', type=>'int'},
+  {ftype=>1, tag=>'ssize', name=>'Usable addresses', type=>'int'},
+  {ftype=>0, name=>'Address Usage'},
+  {ftype=>1, tag=>'inuse', name=>'Addresses in use', type=>'int'},
+  {ftype=>1, tag=>'inusep', name=>'Usage', type=>'int'},
+  {ftype=>0, name=>'Routers'},
+  {ftype=>1, tag=>'gateways', name=>'Gateway(s)', type=>'text'}
+ ],
+ nwidth=>'40%'
+);
+
+my %net_info_form6=(
+ data=>[
+  {ftype=>0, name=>'Net'},
+  {ftype=>1, tag=>'net', name=>'Net (CIDR)', type=>'cidr'},
+  {ftype=>1, tag=>'base', name=>'Base', type=>'cidr'},
+  {ftype=>1, tag=>'netmask', name=>'Prefix length', type=>'cidr'},
+  #{ftype=>1, tag=>'hostmask', name=>'Hostmask', type=>'cidr'},
   {ftype=>1, tag=>'size', name=>'Size', type=>'int'},
   {ftype=>0, name=>'Usable address range'},
   {ftype=>1, tag=>'first', name=>'Start', type=>'int'},
@@ -416,41 +451,42 @@ sub menu_handler {
 	     " AND a.ip << '$net{net}' ORDER BY a.ip;",\@q);
     $net{inuse}=@q;
     for $i (0..$#q) {
-      $ip=$q[$i][0]; $ip=~s/\/32$//;
+      $ip=$q[$i][0]; 
+      $ip=~s/\/32$//;
       $netmap{$ip}=1;
       $net{gateways}.="$q[$i][0] " . ($q[$i][2] ? "($q[$i][2])":'') .
 	              "<br>" if ($q[$i][1] > 0);
     }
 
-    my $netmask = new Net::Netmask($net{net});
-    $net{base}=$netmask->base();
-    $net{netmask}=$netmask->mask();
-    $net{hostmask}=$netmask->hostmask();
-    $net{broadcast}=$netmask->broadcast();
-    $net{size}=$netmask->size();
-    $net{first}=$netmask->nth(1);
-    $net{last}=$netmask->nth(-2);
-    $net{ssize}=$netmask->size()-2;
-    $net{inusep}=sprintf("%3.0f", ($net{inuse} / $net{size})*100) ."%";
+    my $netrange = new Net::IP($net{net});
+    my $inetFamily = $netrange->version();
 
-    $sta=($netmap{$net{first}} > 0 ? 1 : 0);
-    $si=1;
-    for $i (1..($netmask->size()-1)) {
-      $ip=$netmask->nth($i);
-      $nstate=($netmap{$ip} > 0 ? 1 : 0);
-      if ($nstate != $sta) {
-	push @blocks, [$sta,($i-$si),$netmask->nth($si),$netmask->nth($i-1)];
-	$si=$i;
-      }
-      $sta=$nstate;
+    $net{base}= ip_compress_address($netrange->ip(), $inetFamily);
+    $net{netmask}= ($inetFamily == 4 ? $netrange->mask() : $netrange->prefixlen());
+    #$net{hostmask}= $netrange->mask();
+    $net{broadcast}= ip_compress_address($netrange->last_ip(), $inetFamily);
+    $net{size}= sprintf("%.0f",$netrange->size());
+    $net{first}= ip_compress_address(($netrange + 1)->ip(), $inetFamily);
+
+    if($inetFamily == 4) {
+    $net{last} = ip_compress_address(($netrange + ($netrange->size() - 2))->ip(), $inetFamily) if $inetFamily == 4;
+    $net{ssize}= $net{size} - 2;
     }
-    $i=$netmask->size()-1;
-    push( @blocks, [$sta,($i-$si),$netmask->nth($si),$netmask->nth($i-1)] )
-      if ($si < $i);
+    elsif($inetFamily == 6) {
+    $net{last} = ip_compress_address(($netrange + ($netrange->size() - 1))->ip(), $inetFamily) if $inetFamily == 6;
+    $net{ssize}= $net{size} - 1;
+    }
+
+    $net{inusep}=sprintf("%3.0f", ($net{inuse} / $net{size})*100) ."%";
 
     print "<TABLE width=\"100%\"><TR><TD valign=\"top\">";
 
-    display_form(\%net,\%net_info_form);
+    if($inetFamily == 6) {
+        display_form(\%net,\%net_info_form6);
+    }
+    else {
+        display_form(\%net,\%net_info_form);
+    }
     print p,startform(-method=>'GET',-action=>$selfurl),
           hidden('menu','nets'),
           submit(-name=>'sub',-value=>'<-- Back'),
@@ -458,8 +494,24 @@ sub menu_handler {
 
     print "</TD><TD valign=\"top\">";
 
-    if ($net{subnet} eq 't') {
-      print "<TABLE cellspacing=0 cellpadding=3 border=0 bgcolor=\"eeeeef\">",
+    if ($net{subnet} eq 't' and $inetFamily == 4) {
+   
+        $sta=($netmap{$net{first}} > 0 ? 1 : 0);
+        $si=1;
+        for $i (1..($net{size} - 1)) {
+          $ip= ($netrange + $i)->ip();
+          $nstate=($netmap{$ip} > 0 ? 1 : 0);
+          if ($nstate != $sta) {
+        push @blocks, [$sta,($i-$si),($netrange + $si)->ip(),($netrange + ($i - 1))->ip()];
+        $si=$i;
+          }
+          $sta=$nstate;
+        }
+        $i = $net{size} - 1;
+        push( @blocks, [$sta,($i-$si),($netrange + $si)->ip(),($netrange + ($i - 1))->ip()] )
+          if ($si < $i);
+
+       print "<TABLE cellspacing=0 cellpadding=3 border=0 bgcolor=\"eeeeef\">",
           "<TR><TH colspan=3 bgcolor=\"#ffffff\">Net usage map</TH></TR>",
 	  "<TR bgcolor=\"#aaaaff\">",td("Size"),td("Start"),td("End"),"</TR>";
       $sta=0;
@@ -552,7 +604,7 @@ sub menu_handler {
 	    unless (check_perms('superuser','',1));
     print submit(-name=>'sub',-value=>'Net Info')," ";
     print submit(-name=>'sub',-value=>'Ping Sweep')
-            unless (check_perms('level',$main::ALEVEL_NMAP,1));
+            unless check_perms('level',$main::ALEVEL_NMAP,1);
     print hidden('net_id',$id),end_form,"</TD><TD>";
     my $old_menu = param('menu');
     my $old_sub = param('sub');
