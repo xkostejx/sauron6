@@ -636,8 +636,8 @@ sub menu_handler {
 	}
       }
       print h2("Move host to another IP");
-      my $tmpnet=new Net::Netmask(param('move_net'));
-      $newip=auto_address($serverid,$tmpnet->desc());
+      my $tmpnet= new Net::IP(param('move_net'));
+      $newip=auto_address($serverid,param('move_net'));
       unless(is_cidr($newip)) {
 	logmsg("notice","auto_address($serverid,".param('move_net').
 	       ") failed!");
@@ -1367,11 +1367,11 @@ sub menu_handler {
     }
     elsif (param('addhost_submit')) {
       unless (($res=form_check_form('addhost',\%data,$newhostform))) {
-	if ($data{type}==1 && $data{net} ne 'MANUAL' &&
+	if (($data{type}==1 || $data{type} == 101) && $data{net} ne 'MANUAL' &&
 	    not is_cidr($data{ip})) {
 	  #my $tmpnet=new Net::Netmask($data{net});
 	  #$ip=auto_address($serverid,$tmpnet->desc());
-	  $ip=auto_address($serverid,$data{net});
+      $ip=auto_address($serverid,$data{net});
 	  unless (is_cidr($ip)) {
 	    logmsg("notice","auto_address($serverid,$data{net}) failed!");
 	    alert1("Cannot get free IP: $ip");
@@ -1412,7 +1412,7 @@ sub menu_handler {
 	      unless ($data{expiration} > 0 && $data{expiration} < $tmp)
 	  }
 	  
-	  write2log(Dumper(\%data));
+	  #write2log(Dumper(\%data));
           $res=add_host(\%data);
 	  if ($res > 0) {
 	    update_history($state->{uid},$state->{sid},1,
