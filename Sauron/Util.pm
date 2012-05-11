@@ -281,34 +281,33 @@ sub arpa2cidr($) {
 # convert CIDR format address into in-addr.arpa format address
 sub cidr2arpa($) {
   my($cidr) = @_;
-  my($i,@a,$e,$arpa);
+  #my($i,@a,$e,$arpa);
 
-  @a=4; $e=0;
-  $arpa='';
+  #@a=4; $e=0;
+  #$arpa='';
 
-  if ($cidr =~ /^\s*(\d{1,3})(\.(\d{1,3}))?(\.(\d{1,3}))?(\.(\d{1,3}))?(\/(\d{1,2}))?\s*$/) {
-    #print "1=$1 3=$3 5=$5 7=$7 9=$9\n";
-    $a[0]=$1; $e=8;
-    if (defined $3) { $a[1]=$3; $e=16; } else { $a[1]=0; }
-    if (defined $5) { $a[2]=$5; $e=24; } else { $a[2]=0; }
-    if (defined $7) { $a[3]=$7; $e=32; } else { $a[3]=0; }
-    if ($9) { $e=$9; }
-  }
-  else {
-    $a[0]=0; $a[1]=0; $a[2]=0; $a[3]=0; $e=0;
-  }
+  #if ($cidr =~ /^\s*(\d{1,3})(\.(\d{1,3}))?(\.(\d{1,3}))?(\.(\d{1,3}))?(\/(\d{1,2}))?\s*$/) {
+  #  #print "1=$1 3=$3 5=$5 7=$7 9=$9\n";
+  #  $a[0]=$1; $e=8;
+  #  if (defined $3) { $a[1]=$3; $e=16; } else { $a[1]=0; }
+  #  if (defined $5) { $a[2]=$5; $e=24; } else { $a[2]=0; }
+  #  if (defined $7) { $a[3]=$7; $e=32; } else { $a[3]=0; }
+  #  if ($9) { $e=$9; }
+  #}
+  #else {
+  #  $a[0]=0; $a[1]=0; $a[2]=0; $a[3]=0; $e=0;
+  #}
 
-  $e=0 if ($e < 0);
-  $e=32 if ($e > 32);
-  $e=$e >> 3;
+  #$e=0 if ($e < 0);
+  #$e=32 if ($e > 32);
+  #$e=$e >> 3;
 
-  for($i=$e-1;$i >= 0;$i--) {
-    $arpa.="$a[$i].";
-  }
-  $arpa.='0.' if ($e == 0);
-  $arpa.="in-addr.arpa";
-
-  return $arpa;
+  #for($i=$e-1;$i >= 0;$i--) {
+  #  $arpa.="$a[$i].";
+  #}
+  #$arpa.='0.' if ($e == 0);
+  #$arpa.="in-addr.arpa";
+  return new Net::IP($cidr)->reverse_ip();
 }
 
 
