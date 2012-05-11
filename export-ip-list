@@ -13,6 +13,7 @@ use Sauron::DB;
 use Sauron::Util;
 use Sauron::BackEnd;
 use Sauron::Sauron;
+use Data::Dumper;
 
 sub optimize_ip_list($);
 
@@ -25,17 +26,18 @@ $time_now = localtime;
 $tnow = time();
 $tmp_extension = ".tmp.$<.$$"; # generate extension for temp files
 
-GetOptions("help|h","verbose|v","inverse|i","optimize|o","netsonly|n");
+GetOptions("help|h","verbose|v","inverse|i","optimize|o","netsonly|n","4");
 
 if ($opt_help || @ARGV < 1) {
   print "syntax: $0 [--help] [OPTIONS] <servername> [[networknamemask] ...]\n",
         "\noptions:\n",
 #	"\t--inverse\t\tlist IPs not in use\n",
+	"\t--4\t\tOnly IPv4 records\n",
 	"\t--netsonly\tlist only matching (sub)nets\n",
 	"\t--optimize\tcombine continuous IP blocks into CIDRs\n",
 	"\t--verbose\tmore verbose output\n",
     "\t\n",
-    "*** Warning - optimized output doesn't contain IPv6 subnets ***\n\n";
+    "*** Warning - optimized output doesn't optimize IPv6 records ***\n\n";
 
   print "\n" if ($opt_help);
   exit(0);
@@ -45,6 +47,7 @@ $opt_optimize = ($opt_optimize ? 1 : 0);
 $opt_verbose = ($opt_verbose ? 1 : 0);
 $opt_inverse = ($opt_inverse ? 1 : 0);
 $opt_netsonly = ($opt_netsonly ? 1 : 0);
+$opt_4 = ($opt_4 ? 1 : 0);
 $servername=shift;
 while (($mask=shift)) {  push @masks, $mask; }
 
@@ -60,6 +63,8 @@ print "# server: $servername\n# mask(s): ".join(",",@masks).
 # select nets using mask(s) (select all if no masks defined)
 
 my $netblocks = {};
+my @blocks;
+
 db_query("SELECT id,net,netname " .
 	 "FROM nets " .
 	 "WHERE server=$serverid AND dummy=false " .
@@ -78,10 +83,15 @@ for $i (0..$#allnets) {
   }
 
   if ($match) {
-    push @nets, $net;
+    my $block = new Net::IP($net);
+    if($opt_4) {
+        push @nets, $net if $block->version() == 4;
+    }
+    else {
+        push @nets, $net;
+    }
 
-    my $block = new2 Net::Netmask($net);
-    $block->storeNetblock($netblocks) if defined $block;
+    push @blocks, $block if defined $block;
   }
 }
 
@@ -112,21 +122,31 @@ error("No IPs found for this server!") unless (@ips > 0);
 
 # build list of active IPs within selected nets
 
+my @ip6s;
+
 for $i (0..$#ips) {
   ($ip,$host,$domain,$edate)=@{$ips[$i]};
   my $block;
 
-  if (($block=findNetblock($ip,$netblocks))) {
-    unless ($edate > 0 && $edate < $tnow) {
-      push @iplist, $ip if ($ip ne $lastip);
-      $lastip=$ip;
+    my $tIP = new Net::IP($ip);
+    next if ($tIP->version() == 6 and $opt_4);
+    push @ip6s, $ip if $tIP->version == 6 and $opt_optimize;
+ 
+    foreach my $b (@blocks){
+        if($b->overlaps($tIP) == $IP_B_IN_A_OVERLAP) {
+            unless ($edate > 0 && $edate < $tnow) {
+                push @iplist, $ip if ($ip ne $lastip);
+                $lastip=$ip;
+            }
+            
+            last;
+        }
     }
-  }
 }
 
 $ipcount=@iplist;
 @iplist=optimize_ip_list(\@iplist) if ($opt_optimize);
-
+push @iplist, @ip6s;
 
 # print IPs/CIDRs...
 
