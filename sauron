@@ -595,9 +595,12 @@ if ($bind_conf) {
       # zone A records
       if (@{$zone{ip}} > 1) {
 	print ZONEFILE ";\n; zone A record(s)\n;\n" if ($bind_conf);
-	for $i (1..$#{$zone{ip}}) {
+	
+    for $i (1..$#{$zone{ip}}) {
 	  next unless ($zone{ip}[$i][3] =~ /^(t|true|1)$/);
 	  ($ip=$zone{ip}[$i][1]) =~ s/\/32$//;
+	  $ip =~ s/\/128$//;
+
 	  $ttl=''; # fixme
 	  my $recA = (ip_is_ipv4($ip) ? 'A' : 'AAAA');
       printf ZONEFILE $ZFORMAT, '',$ttl,$class,$recA,$ip if ($bind_conf);
@@ -979,9 +982,12 @@ if ($bind_conf) {
 	  if ($q[$i][7]) { $info.=" " if ($info); $info.=$q[$i][7]; }
 	  if ($q[$i][8]) { $info.=", " if ($info); $info.=$q[$i][8]; }
 	  
+      print "$domain - $ip - HW : $hinfo_hw, SW : $hinfo_sw\n";
+      
       my $recA = (ip_is_ipv4($ip) ? 'A' : 'AAAA');
-	  if ($dnames{$domain}) {
-	    #error("duplicate A record $ip for $domain ($dnames{$domain}).");
+      
+      if ($dnames{$domain} and ip_get_version($dnames{$domain}) == ip_get_version($ip)) {
+	    print ("duplicate A record $ip for $domain ($dnames{$domain}).");
         printf ZONEFILE $ZFORMAT, $domain,$ttl,$class,$recA,$ip
 	      if ($bind_conf);
 	    printf ZONEFILE ";\n" if ($bind_conf);
