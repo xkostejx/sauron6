@@ -163,6 +163,30 @@ my %server_form = (
   {ftype=>1, tag=>'df_loadbalmax', name=>'Load balance max (seconds)',
    type=>'int', len=>5, iff=>['masterserver','-1']},
 
+  {ftype=>0, name=>'DHCP6 Settings'},
+  {ftype=>3, tag=>'dhcp_flags_ad6', name=>'auto-domainnames',
+   type=>'enum', enum=>{0=>'No',1=>'Yes'}, iff=>['masterserver','-1']},
+  {ftype=>2, tag=>'dhcp6', name=>'Global DHCP Settings', type=>['text','text'],
+   fields=>2, len=>[50,20], maxlen=>[200,20], empty=>[0,1],
+   elabels=>['dhcptab line','comment'], iff=>['masterserver','-1']},
+
+  {ftype=>0, name=>'DHCP6 Failover Settings'},
+  {ftype=>3, tag=>'dhcp_flags_fo6', name=>'Enable failover protocol',
+   type=>'enum', enum=>{0=>'No',1=>'Yes'}, iff=>['masterserver','-1']},
+  {ftype=>1, tag=>'df_port6', name=>'Port number', type=>'int', len=>5,
+   iff=>['masterserver','-1']},
+  {ftype=>1, tag=>'df_max_delay6', name=>'Max Response Delay',
+   type=>'int', len=>5, iff=>['masterserver','-1']},
+  {ftype=>1, tag=>'df_max_uupdates6', name=>'Max Unacked Updates',
+   type=>'int', len=>5, iff=>['masterserver','-1']},
+  {ftype=>1, tag=>'df_mclt6', name=>'MCLT', type=>'int', len=>6,
+   iff=>['masterserver','-1']},
+  {ftype=>1, tag=>'df_split6', name=>'Split', type=>'int', len=>5,
+   iff=>['masterserver','-1']},
+  {ftype=>1, tag=>'df_loadbalmax6', name=>'Load balance max (seconds)',
+   type=>'int', len=>5, iff=>['masterserver','-1']},
+
+
   {ftype=>0, name=>'Record info', no_edit=>1},
   {ftype=>4, name=>'Record created', tag=>'cdate_str', no_edit=>1},
   {ftype=>4, name=>'Last modified', tag=>'mdate_str', no_edit=>1}

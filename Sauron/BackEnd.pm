@@ -372,6 +372,7 @@ sub get_record($$$$$) {
   undef %{$rec};
   @list = split(",",$fields);
   $fields =~ s/\@//g;
+
   db_query("SELECT $fields FROM $table WHERE $keyname=".db_encode_str($key),
 	   \@q);
   return -1 if (@q < 1);
@@ -720,7 +721,9 @@ sub get_server($$) {
 		    "multiple_cnames,rfc2308_type1,authnxdomain," .
 		    "df_port,df_max_delay,df_max_uupdates,df_mclt,df_split,".
 		    "df_loadbalmax,hostaddr,".
-		    "cdate,cuser,mdate,muser,lastrun",
+		    "cdate,cuser,mdate,muser,lastrun," .
+		    "df_port6,df_max_delay6,df_max_uupdates6,df_mclt6,df_split6,".
+		    "df_loadbalmax6,dhcp_flags6",
 		    $id,$rec,"id");
   return -1 if ($res < 0);
   fix_bools($rec,"no_roots,zones_only");
@@ -744,6 +747,8 @@ sub get_server($$) {
 		  "type=11 AND ref=$id ORDER BY id",$rec,'custom_opts');
   get_array_field("txt_entries",3,"id,txt,comment","TXT,Comments",
 		  "type=13 AND ref=$id ORDER BY id",$rec,'bind_globals');
+  get_array_field("dhcp_entries6",3,"id,dhcp,comment","DHCP6,Comments",
+		  "type=1 AND ref=$id ORDER BY id",$rec,'dhcp6');
 
   get_aml_field($id,14,$id,$rec,'allow_query_cache');
   get_aml_field($id,15,$id,$rec,'allow_notify');
@@ -755,6 +760,9 @@ sub get_server($$) {
   $rec->{named_flags_hinfo}=($rec->{named_flags} & 0x04 ? 1 : 0);
   $rec->{named_flags_wks}=($rec->{named_flags} & 0x08 ? 1 : 0);
 
+  $rec->{dhcp_flags_ad6}=($rec->{dhcp_flags6} & 0x01 ? 1 : 0);
+  $rec->{dhcp_flags_fo6}=($rec->{dhcp_flags6} & 0x02 ? 1 : 0);
+  
   if ($rec->{masterserver} > 0) {
     db_query("SELECT name FROM servers WHERE id=$rec->{masterserver}",\@q);
     $rec->{server_type}="Slave for $q[0][0] (id=$rec->{masterserver})";
@@ -774,6 +782,7 @@ sub update_server($) {
 
   del_std_fields($rec);
   delete $rec->{dhcp_flags};
+  delete $rec->{dhcp_flags6};
   delete $rec->{server_type};
 
   $rec->{dhcp_flags}=0;
@@ -781,6 +790,13 @@ sub update_server($) {
   $rec->{dhcp_flags}|=0x02 if ($rec->{dhcp_flags_fo});
   delete $rec->{dhcp_flags_ad};
   delete $rec->{dhcp_flags_fo};
+  
+  $rec->{dhcp_flags6}=0;
+  $rec->{dhcp_flags6}|=0x01 if ($rec->{dhcp_flags_ad6});
+  $rec->{dhcp_flags6}|=0x02 if ($rec->{dhcp_flags_fo6});
+  delete $rec->{dhcp_flags_ad6};
+  delete $rec->{dhcp_flags_fo6};
+
   $rec->{named_flags}=0;
   $rec->{named_flags}|=0x01 if ($rec->{named_flags_ac});
   $rec->{named_flags}|=0x02 if ($rec->{named_flags_isz});
@@ -803,6 +819,10 @@ sub update_server($) {
   $r=update_array_field("dhcp_entries",3,"dhcp,comment,type,ref",'dhcp',$rec,
 		        "1,$id");
   if ($r < 0) { db_rollback(); return -13; }
+  # dhcp6
+  $r=update_array_field("dhcp_entries6",3,"dhcp,comment,type,ref",'dhcp6',$rec,
+		        "1,$id");
+  if ($r < 0) { db_rollback(); return -132; }
   # txt
   $r=update_array_field("txt_entries",3,"txt,comment,type,ref",
 			'txt',$rec,"3,$id");
@@ -864,6 +884,10 @@ sub add_server($) {
   if ($res < 0) { db_rollback(); return -10; }
   # dhcp
   $res = add_array_field('dhcp_entries','dhcp,comment','dhcp',$rec,
+			 'type,ref',"1,$id");
+  if ($res < 0) { db_rollback(); return -11; }
+  # dhcp6
+  $res = add_array_field('dhcp_entries6','dhcp,comment','dhcp6',$rec,
 			 'type,ref',"1,$id");
   if ($res < 0) { db_rollback(); return -11; }
   # txt
@@ -958,6 +982,32 @@ sub delete_server($) {
 	        "SELECT a.id FROM dhcp_entries a, vlans v " .
 	        "WHERE v.server=$id AND a.type=6 AND a.ref=v.id);");
   if ($res < 0) { db_rollback(); return -8; }
+
+# dhcp_entries6
+  $res=db_exec("DELETE FROM dhcp_entries6 WHERE type=1 AND ref=$id;");
+  if ($res < 0) { db_rollback(); return -3; }
+  $res=db_exec("DELETE FROM dhcp_entries6 WHERE id IN ( " .
+	        "SELECT a.id FROM dhcp_entries6 a, zones z " .
+	        "WHERE z.server=$id AND a.type=2 AND a.ref=z.id);");
+  if ($res < 0) { db_rollback(); return -4; }
+  $res=db_exec("DELETE FROM dhcp_entries6 WHERE id IN ( " .
+	        "SELECT a.id FROM dhcp_entries6 a, zones z, hosts h " .
+	        "WHERE z.server=$id AND h.zone=z.id AND a.type=3 " .
+	        " AND a.ref=h.id);");
+  if ($res < 0) { db_rollback(); return -5; }
+  $res=db_exec("DELETE FROM dhcp_entries6 WHERE id IN ( " .
+	        "SELECT a.id FROM dhcp_entries6 a, nets n " .
+	        "WHERE n.server=$id AND a.type=4 AND a.ref=n.id);");
+  if ($res < 0) { db_rollback(); return -6; }
+  $res=db_exec("DELETE FROM dhcp_entries6 WHERE id IN ( " .
+	        "SELECT a.id FROM dhcp_entries6 a, groups g " .
+	        "WHERE g.server=$id AND a.type=5 AND a.ref=g.id);");
+  if ($res < 0) { db_rollback(); return -7; }
+  $res=db_exec("DELETE FROM dhcp_entries6 WHERE id IN ( " .
+	        "SELECT a.id FROM dhcp_entries a, vlans v " .
+	        "WHERE v.server=$id AND a.type=6 AND a.ref=v.id);");
+  if ($res < 0) { db_rollback(); return -8; }
+
 
   # host_info
   # FIXME
