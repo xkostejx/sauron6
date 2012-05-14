@@ -14,12 +14,26 @@ use Sauron::Util;
 use Sauron::CGI::Utils;
 use strict;
 use vars qw($VERSION @ISA @EXPORT);
+use Sys::Syslog qw(:DEFAULT setlogsock);
+Sys::Syslog::setlogsock('unix');
+use Data::Dumper;
+
 
 $VERSION = '$Id: Zones.pm,v 1.8 2008/02/11 08:34:27 tjko Exp $ ';
 
 @ISA = qw(Exporter); # Inherit from Exporter
 @EXPORT = qw(
 	    );
+
+
+sub write2log{
+  my $msg       = shift;
+  my $filename  = File::Basename::basename($0);
+
+  Sys::Syslog::openlog($filename, "cons,pid", "debug");
+  Sys::Syslog::syslog("info", "$msg");
+  Sys::Syslog::closelog();
+} # End of write2log
 
 
 my %new_zone_form=(
@@ -55,7 +69,7 @@ my %zone_form = (
   {ftype=>3, tag=>'class', name=>'Class', type=>'enum', conv=>'L',
    enum=>{in=>'IN (internet)',hs=>'HS',hesiod=>'HESIOD',chaos=>'CHAOS'}},
   {ftype=>2, tag=>'masters', name=>'Masters', type=>['ip','text'], fields=>2,
-   len=>[15,45], empty=>[0,1], elabels=>['IP','comment'], iff=>['type','S']},
+   len=>[42,45], empty=>[0,1], elabels=>['IP','comment'], iff=>['type','S']},
   {ftype=>1, tag=>'hostmaster', name=>'Hostmaster', type=>'domain', len=>30,
    empty=>1, definfo=>['','Default (from server)'], iff=>['type','M']},
   {ftype=>3, tag=>'chknames', name=>'Check-names', type=>'enum',
@@ -79,7 +93,7 @@ my %zone_form = (
    iff=>['type','M']},
   {ftype=>1, tag=>'ttl', name=>'Default TTL', type=>'int', len=>10,
    empty=>1, definfo=>['','Default (from server)'], iff=>['type','M']},
-  {ftype=>5, tag=>'ip', name=>'IP addresses (A)', iff=>['type','M'],
+  {ftype=>5, tag=>'ip', name=>'IP addresses', iff=>['type','M'],
    iff2=>['reverse','f']},
   {ftype=>2, tag=>'ns', name=>'Name servers (NS)', type=>['text','text'],
    fields=>2,
@@ -165,7 +179,7 @@ sub menu_handler {
       unless (($res=form_check_form('addzone',\%data,\%new_zone_form))) {
 	if ($data{reverse} eq 't' || $data{reverse} == 1) {
 	  my $new_net=arpa2cidr($data{name});
-	  if ($new_net eq '0.0.0.0/0') {
+      if ($new_net eq '0.0.0.0/0') {
 	    print h2('Invalid name for reverse zone!');
 	    goto new_zone_edit;
 	  }
@@ -234,7 +248,7 @@ sub menu_handler {
 	$|=1; # if ($frame_mode);
 	print p,"Copying zone...please wait few minutes (or hours :)";
 	$res=copy_zone($zoneid,$serverid,$data{name},1);
-	if ($res < 0) {
+    if ($res < 0) {
 	  print '<FONT color="red">',h2("Zone copy failed! ($res)"),
 	        '</FONT>';
 	} else {
