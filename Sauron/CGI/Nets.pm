@@ -465,7 +465,7 @@ sub menu_handler {
     $net{netmask}= ($inetFamily == 4 ? $netrange->mask() : $netrange->prefixlen());
     #$net{hostmask}= $netrange->mask();
     $net{broadcast}= ip_compress_address($netrange->last_ip(), $inetFamily);
-    $net{size}= sprintf("%.0f",$netrange->size());
+    $net{size}= sprintf("%u",$netrange->size());
     $net{first}= ip_compress_address(($netrange + 1)->ip(), $inetFamily);
 
     if($inetFamily == 4) {
