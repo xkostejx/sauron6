@@ -982,12 +982,10 @@ if ($bind_conf) {
 	  if ($q[$i][7]) { $info.=" " if ($info); $info.=$q[$i][7]; }
 	  if ($q[$i][8]) { $info.=", " if ($info); $info.=$q[$i][8]; }
 	  
-      print "$domain - $ip - HW : $hinfo_hw, SW : $hinfo_sw\n";
-      
       my $recA = (ip_is_ipv4($ip) ? 'A' : 'AAAA');
       
       if ($dnames{$domain} and ip_get_version($dnames{$domain}) == ip_get_version($ip)) {
-	    print ("duplicate A record $ip for $domain ($dnames{$domain}).");
+	    #print ("duplicate A record $ip for $domain ($dnames{$domain}).");
         printf ZONEFILE $ZFORMAT, $domain,$ttl,$class,$recA,$ip
 	      if ($bind_conf);
 	    printf ZONEFILE ";\n" if ($bind_conf);
@@ -1859,12 +1857,12 @@ sub make_dhcp6() {
   if ($failover_mode) {
     $foserver=($failover_mode == 1 ? \%server : \%masterserver);
     $fo_host=$server{hostname};
-    $fo_port=$fo_pport=$foserver->{df_port};
-    $fo_mrd=$foserver->{df_max_delay};
-    $fo_muu=$foserver->{df_max_uupdates};
-    $fo_mclt=$foserver->{df_mclt};
-    $fo_split=$foserver->{df_split};
-    $fo_lbm=$foserver->{df_loadbalmax};
+    $fo_port=$fo_pport=$foserver->{df_port6};
+    $fo_mrd=$foserver->{df_max_delay6};
+    $fo_muu=$foserver->{df_max_uupdates6};
+    $fo_mclt=$foserver->{df_mclt6};
+    $fo_split=$foserver->{df_split6};
+    $fo_lbm=$foserver->{df_loadbalmax6};
     if ($failover_mode == 1) {
       undef @q;
       db_query("SELECT hostname FROM servers " .
@@ -1921,7 +1919,7 @@ sub make_dhcp6() {
 
   print DHCPFILE "\n# global options\n\n";
   undef @q;
-  db_query("SELECT d.dhcp FROM dhcp_entries d " .
+  db_query("SELECT d.dhcp FROM dhcp_entries6 d " .
 	   "WHERE d.type=1 AND d.ref=$serverid ORDER BY d.id",\@q);
   for $i (0..$#q) {
       $q[$i][0].=';' unless ($q[$i][0] =~ /[;\{\}]\s*$/);
@@ -1947,7 +1945,7 @@ sub make_dhcp6() {
 	               "(option host-identifier option dhcp6.client-id);\n"
 			 if ($dclasses[$i][2] == 3);
 	undef @q;
-	db_query("SELECT dhcp FROM dhcp_entries " .
+	db_query("SELECT dhcp FROM dhcp_entries6 " .
 		 "WHERE type=5 and ref=$dclasses[$i][0] ORDER BY id",\@q);
 	for $j (0..$#q) {
 	    $q[$j][0].=';' unless ($q[$j][0] =~ /[;\{\}]\s*$/);
@@ -2004,7 +2002,7 @@ sub make_dhcp6() {
     undef %dpools_dhcp;
     for $i (0..$#dpools) {
       undef @q;
-      db_query("SELECT dhcp FROM dhcp_entries " .
+      db_query("SELECT dhcp FROM dhcp_entries6 " .
 	       "WHERE type=5 AND ref=$dpools[$i][0] ORDER BY id",\@q);
       $dpools_dhcp{$i}=[];
       for $j (0..$#q) { push @{$dpools_dhcp{$i}}, $q[$j][0]; }
@@ -2030,7 +2028,7 @@ sub make_dhcp6() {
     if ($net_map_mode == 1) {
       print DHCPFILE "shared-network \"$netname\" {\n";
       undef @net_dhcp;
-      db_query("SELECT d.dhcp FROM dhcp_entries d " .
+      db_query("SELECT d.dhcp FROM dhcp_entries6 d " .
 	       "WHERE d.type=4 AND d.ref=$nets[$i][2] ORDER BY d.id",
 	       \@net_dhcp);
       for $j (0..$#net_dhcp) { 
@@ -2076,7 +2074,7 @@ sub make_dhcp6() {
       $netname = 'CHAOS' if ($vlan < 1 || $netname eq '');
       print DHCPFILE "shared-network \"$netname\" {\n";
       undef @vlan_dhcp;
-      db_query("SELECT d.dhcp FROM dhcp_entries d " .
+      db_query("SELECT d.dhcp FROM dhcp_entries6 d " .
 	       "WHERE d.type=6 AND d.ref=$vlan ORDER BY d.id",\@vlan_dhcp);
       for $i (0..$#vlan_dhcp) {
 	$vlan_dhcp[$i][0].=';' unless ($vlan_dhcp[$i][0] =~ /[;\{\}]\s*$/);
@@ -2119,7 +2117,7 @@ sub make_dhcp6() {
 	print DHCPFILE "group {  # $group\n";
 	undef @qqq;
 	undef @gperhost; # per host macro store
-	db_query("SELECT d.dhcp FROM dhcp_entries d " .
+	db_query("SELECT d.dhcp FROM dhcp_entries6 d " .
 		 "WHERE d.type=5 AND d.ref=$gid ORDER BY d.id",\@qqq);
 	for $k (0..$#qqq) {
 	  $qqq[$k][0] =~ s/\\"/"/g;
