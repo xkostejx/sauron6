@@ -74,7 +74,7 @@ my %server_form = (
   {ftype=>3, tag=>'forward', name=>'Forward (mode)', type=>'enum',
    conv=>'U', enum=>{'D'=>'Default','O'=>'Only','F'=>'First'}},
   {ftype=>2, tag=>'forwarders', name=>'Forwarders', fields=>2,
-   type=>['ip','text'], len=>[20,30], empty=>[0,1],elabels=>['IP','comment']},
+   type=>['ip','text'], len=>[45,30], empty=>[0,1],elabels=>['IP','comment']},
   {ftype=>1, tag=>'transfer_source', name=>'Transfer source IP',
    type=>'ip', empty=>1, definfo=>['','Default'], len=>40},
   {ftype=>1, tag=>'query_src_ip', name=>'Query source IP',
@@ -84,7 +84,7 @@ my %server_form = (
   {ftype=>1, tag=>'listen_on_port', name=>'Listen on port',
    type=>'port', empty=>1, definfo=>['','Default port'], len=>5},
   {ftype=>2, tag=>'listen_on', name=>'Listen-on', fields=>2,
-   type=>['cidr','text'], len=>[20,30], empty=>[0,1],
+   type=>['cidr','text'], len=>[45,30], empty=>[0,1],
    elabels=>['CIDR','comment']},
 
   {ftype=>0, name=>'Access control'},
