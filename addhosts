@@ -13,7 +13,6 @@ use Sauron::Util;
 use Sauron::UtilZone;
 use Sauron::BackEnd;
 use Sauron::Sauron;
-
 load_config();
 
 
@@ -120,8 +119,9 @@ foreach $domain (sort keys %zonedata) {
     $id=-1;
   }
 
-  unless (@{$rec->{A}} > 0 || $rec->{CNAME} || @{$rec->{SRV}} > 0) {
+  unless (@{$rec->{A}} > 0 || @{$rec->{AAAA}} > 0 || $rec->{CNAME} || @{$rec->{SRV}} > 0) {
     print "unknown record type SKIPPED!\n";
+    next;
   }
 
   unless ($id > 0) {
@@ -141,7 +141,7 @@ foreach $domain (sort keys %zonedata) {
   $host{type}=$force_type if ($force_type > 0);
   print " type: $host{type}\n" if ($opt_verbose);
 
-  $a=$rec->{A};
+  $a= (@{$rec->{A}} > 0 ? $rec->{A} : $rec->{AAAA}) ;
   if ($host{type}==1) {
     for $i (0..$#{$a}) {
       print " IP: $$a[$i]\n" if ($opt_verbose);
