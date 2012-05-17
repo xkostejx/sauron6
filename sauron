@@ -1339,6 +1339,7 @@ sub print_cidr_list($$$$) {
 	    = @{$q[$j]};
 	  
 	$ip =~ s/\/32\s*$//;
+	$ip =~ s/\/128\s*$//;
 	$com=($comment ? "  // $comment" : "");
 	$op=($op == 1 ? '!' : ' ');
 	$val='';
@@ -1557,7 +1558,7 @@ sub make_dhcp() {
 
   # net/subnet map
 
-  $net_map_mode=0;  # 0=use VLANs, 1=use networks
+  $net_map_mode=2;  # 0=use VLANs, 1=use networks
 
   print DHCPFILE "\n# network map\n\n";
   undef @subnets;
@@ -1602,7 +1603,7 @@ sub make_dhcp() {
     }
   }
 
-  if ($net_map_mode == 0) {
+  if ($net_map_mode == 0 or $net_map_mode == 2 ) {
     # print network map using VLANs...
     undef %vlanhash;
     for $i (0..$#subnets) {
@@ -2019,7 +2020,7 @@ sub make_dhcp6() {
   }
 
   # net/subnet map
-  $net_map_mode= 2;  # 0=use VLANs, 1=use networks, 2=top-level subnets
+  $net_map_mode= 2;  # 0=use VLANs, 1=use networks, 2= use VLANs, pools included
 
   print DHCPFILE "\n# network map\n\n";
   undef @subnets;
@@ -2059,16 +2060,13 @@ sub make_dhcp6() {
     if ($net_map_mode == 1) {
       print_subnets6();
       print DHCPFILE "}\n\n"; # close bracket for shared-network
-    } 
-    elsif ($net_map_mode == 2) {
-      print_subnets6();
     }
     else {
       push (@subnets,@q);
     }
   }
 
-  if ($net_map_mode == 0) {
+  if ($net_map_mode == 0 or $net_map_mode == 2) {
     # print network map using VLANs...
     undef %vlanhash;
     for $i (0..$#subnets) {
@@ -2364,17 +2362,33 @@ sub print_subnets() {
 	    if ($s==0) { $s=1; $b=$dips[$l][1]; }
 	    elsif ($s==1 && (ip2int($dips[$l][1]) > ip2int($last_ip)+1) ) {
 		$e=$last_ip; 
-		push @{$lst}, "range " . ($b eq $e ? "$b" : "$b $e") .";";
+        $line = "range " . ($b eq $e ? "$b" : "$b $e") .";";
+        if ($net_map_mode == 2) {
+            print DHCPFILE "\t\tpool {\n\t\t\t$line\n\t\t}\n";
+        } 
+        else {
+            push @{$lst}, $line;
+        }
+
         print STDERR "dynamic range $b - $e ($dpools[$k][1])\n"
 		    if ($opt_verbose);
 		$b=$dips[$l][1];
-	    }
-	    $last_ip=$dips[$l][1];
-	  } else {
-	    if ($s==1) { 
+	  }
+	  
+      $last_ip=$dips[$l][1];
+	   } else {
+	   
+       if ($s==1) { 
 	      $e=$last_ip; 
-	      push @{$lst}, "range " . ($b eq $e ? "$b" : "$b $e") .";";
-          print STDERR "dynamic range $b - $e ($dpools[$k][1])\n"
+          $line = "range " . ($b eq $e ? "$b" : "$b $e") .";";
+          if ($net_map_mode == 2) {
+            print DHCPFILE "\t\tpool {\n\t\t\t$line\n\t\t}\n";
+          } 
+          else {
+              push @{$lst}, $line;
+          }
+        
+        print STDERR "dynamic range $b - $e ($dpools[$k][1])\n"
 		if ($opt_verbose);
 	    }
 	    $s=0;
@@ -2382,14 +2396,18 @@ sub print_subnets() {
 	}
 	if ($s==1) { 
 	  $e=$last_ip; 
-      push @{$lst}, "range " . ($b eq $e ? "$b" : "$b $e") .";";
-	  print STDERR "dynamic range $b - $e ($dpools[$k][1])\n" 
-	    if ($opt_verbose);
+	  $line = "range " . ($b eq $e ? "$b" : "$b $e") .";";
+       if ($net_map_mode == 2) {
+           print DHCPFILE "\t\tpool {\n\t\t\t$line\n\t\t}\n";
+       } else {
+       push @{$lst}, $line;
+       }
        print STDERR "dynamic range $b - $e ($dpools[$k][1])\n" 
          if ($opt_verbose);
 	}
       }
     }
+    print DHCPFILE "\t}\n" if $net_map_mode == 2;
   }
 
   unless ($dhcp2_mode) {
@@ -2465,10 +2483,9 @@ sub print_subnets6() {
         if ($s==0) { $s=1; $b=$dips[$l][1]; }
 	    elsif ($s==1 && ((new Net::IP($dips[$l][1]))->intip() > (new Net::IP($last_ip))->intip() + 1) ) {
 		$e=$last_ip; 
-        #push @{$lst}, "range6 " . ($b eq $e ? "$b" : "$b $e") .";";
 		$line = "range6 " . ($b eq $e ? "$b" : "$b $e") .";";
         if ($net_map_mode == 2) {
-            print DHCPFILE "\t\tpool { \n\t\t\t$line\n\t\t}\n";
+            print DHCPFILE "\t\t$line\n";
         } else {
             push @{$lst}, $line;
         }
@@ -2481,10 +2498,9 @@ sub print_subnets6() {
 	  } else {
 	    if ($s==1) { 
 	      $e=$last_ip; 
-	      #push @{$lst}, "range6 " . ($b eq $e ? "$b" : "$b $e") .";";
 	      $line = "range6 " . ($b eq $e ? "$b" : "$b $e") .";";
         if ($net_map_mode == 2) {
-            print DHCPFILE "\t\tpool { \n\t\t\t$line\n\t\t}\n";
+            print DHCPFILE "\t\t$line\n";
         } else {
             push @{$lst}, $line;
         }
@@ -2495,19 +2511,10 @@ sub print_subnets6() {
 	  }
 	}
 	if ($s==1) { 
-	  #$e=$last_ip; 
-	  #push @{$lst}, "range6 " . ($b eq $e ? "$b" : "$b $e") .";";
-	  #print STDERR "dynamic range6 $b - $e ($dpools[$k][1])\n" 
-	  #if ($opt_verbose);
-      #$line = "range6 " . ($b eq $e ? "$b" : "$b $e") .";";
-      # if ($net_map_mode == 2) {
-      #     print DHCPFILE "\t\tpool { $line }\n";
-      # } else {
-      #     push @{$lst}, $line;
-         $e=$last_ip; 
+       $e=$last_ip; 
        $line = "range " . ($b eq $e ? "$b" : "$b $e") .";";
        if ($net_map_mode == 2) {
-           print DHCPFILE "\t\tpool { \n\t\t\t$line\n\t\t}\n";
+           print DHCPFILE "\t\t$line\n";
        } else {
        push @{$lst}, $line;
        }
