@@ -637,7 +637,7 @@ sub check_ipmask($$)
 	my $net = new Net::IP($ip) or return 0;
 	my $eip = $net->ip(); 
 	
-	if($net->version() == 4) {
+	if($net->version() == 4 and $mask =~ /\./) {
 	    my @parts  = split /\./, $mask;
 	    my @tIP = split /\./, $eip;
 
@@ -658,7 +658,7 @@ sub check_ipmask($$)
 	    
 	    return 1;
 	}
-	elsif($net->version() == 6)	{
+	elsif($net->version() == 6 and $mask =~ /\:/)	{
 	    my @parts  = split /\:/, $mask;
 	    my @tIP = split /\:/, $eip;
 
