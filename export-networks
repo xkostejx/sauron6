@@ -69,13 +69,13 @@ for $i (0..$#q) {
 
 unless ($loopback_found) {
   $names{'loopback'}++;
-  printf "%-40s %-15s %s\n", 'loopback', '127', '';
+  printf "%-40s %-15s %s\n", 'loopback', '127.0.0.1/32', '';
   print "#\n";
 }
 
 
 for $i (0..$#q) {
-  ($net=$q[$i][0]) =~ s/\/\d+\s*$//;
+  ($net=$q[$i][0]); # =~ s/\/\d+\s*$//;
   #$net =~ s/\.0//g;
   ($name=$q[$i][1]) =~ s/\s+/_/g;
 
