@@ -123,16 +123,17 @@ sub chk_perms($$$$) {
     
     @n=keys %{$perms{net}};
     return 0  if (@n < 1 && @{$perms{ipmask}} < 1);
-    $ip=ip2int($rule); #print "<br>ip=$rule ($ip)";
+    $ip = new Net::IP($rule)->intip(); #print "<br>ip=$rule ($ip)";
 
     for $i (0..$#n) {
-      $s=ip2int($perms{net}->{$n[$i]}[0]);
-      $e=ip2int($perms{net}->{$n[$i]}[1]);
+      $s= new Net::IP($perms{net}->{$n[$i]}[0])->intip();
+      $e= new Net::IP($perms{net}->{$n[$i]}[1])->intip();
       if (($s > 0) && ($e > 0)) {
 	#print "<br>$i $n[$i] $s,$e : $ip";
 	return 0 if (($s <= $ip) && ($ip <= $e));
       }
     }
+
     for $i (0..$#{$perms{ipmask}}) {
 	$re=$perms{ipmask}[$i];
 

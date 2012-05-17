@@ -1412,7 +1412,6 @@ sub menu_handler {
 	      unless ($data{expiration} > 0 && $data{expiration} < $tmp)
 	  }
 	  
-	  #write2log(Dumper(\%data));
           $res=add_host(\%data);
 	  if ($res > 0) {
 	    update_history($state->{uid},$state->{sid},1,
