@@ -246,7 +246,9 @@ if ($bind_conf) {
            (is_cidr($server{query_src_ip}) ? $server{query_src_ip} : '*') .
            " port " .
 	   ($server{query_src_port} > 0 ? $server{query_src_port} : '*');
-      print BINDFILE "\tquery-source $val;\n";
+      
+      print BINDFILE "\tquery-source $val;\n" if ip_is_ipv4($server{query_src_ip});
+      print BINDFILE "\tquery-source-v6 $val;\n" if ip_is_ipv6($server{query_src_ip});
     }
 
     print BINDFILE "\n";
@@ -409,9 +411,16 @@ if ($bind_conf) {
       if ($type eq 'master' || $type eq 'slave');
     print BINDFILE "\tforward $forward_enum{$zone{forward}};\n"
       if ($forward_enum{$zone{forward}} && $type eq 'forward');
-    ($transfer_source = $zone{transfer_src}) =~ s/\/32$//;
+
+    $zone{transfer_src} =~ s/\/32$//;
+    $zone{transfer_src} =~ s/\/128$//;
+    $transfer_source = $zone{transfer_src};
+    
     print BINDFILE "\ttransfer-source $transfer_source;\n"
-      if (is_cidr($zone{transfer_src}) && $loopcounter < $normalzones);
+      if (is_cidr($transfer_source) && ip_is_ipv4($transfer_source) && $loopcounter < $normalzones);
+
+    print BINDFILE "\ttransfer-source-v6 $transfer_source;\n"
+      if (is_cidr($transfer_source) && ip_is_ipv6($transfer_source) && $loopcounter < $normalzones);
 
     # allow_update
     if (($type eq 'slave') && ($loopcounter >= $normalzones) && 
