@@ -95,7 +95,7 @@ my %zone_form = (
    empty=>1, definfo=>['','Default (from server)'], iff=>['type','M']},
   {ftype=>5, tag=>'ip', name=>'IP addresses', iff=>['type','M'],
    iff2=>['reverse','f']},
-  {ftype=>2, tag=>'ns', name=>'Name servers (NS)', type=>['text','text'],
+  {ftype=>2, tag=>'ns', name=>'Name servers (NS)', type=>['fqdn','text'],
    fields=>2,
    len=>[30,20], empty=>[0,1], elabels=>['NS','comment'], iff=>['type','M']},
   {ftype=>2, tag=>'mx', name=>'Mail exchanges (MX)', 
