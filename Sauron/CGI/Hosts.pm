@@ -1472,7 +1472,7 @@ sub menu_handler {
     param('sub','add');
     if ($host{domain} =~ /^([^\.]+)(\..*)?$/) {
       $p1=$1; $p2=$2;
-      if ($p1 =~ /(\d+)([^\d]+)?/) {
+      if ($p1 =~ /(\d+)([^\d]+)?$/) {
 	my $p3len=length(($p3=$1));
 	$p4 = sprintf("%0${p3len}d",$p3+1);
 	$p1 =~ s/${p3}/${p4}/;
