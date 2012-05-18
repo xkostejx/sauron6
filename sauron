@@ -1558,7 +1558,7 @@ sub make_dhcp() {
 
   # net/subnet map
 
-  $net_map_mode=2;  # 0=use VLANs, 1=use networks
+  $net_map_mode=2;  # 0=use VLANs, 1=use networks, 2= use VLANs, pools in nets
 
   print DHCPFILE "\n# network map\n\n";
   undef @subnets;
@@ -1939,59 +1939,59 @@ sub make_dhcp6() {
 
 
   # dynamic hosts (DHCP classes)
-  unless ($dhcp2_mode) {
-  print_dhcp_classes:
-    undef @dclasses;
-    db_query("SELECT id,name,type FROM groups " .
-	     "WHERE server=$serverid AND (type=3 OR type=103) " .
-	     ($opt_dhcpclass ?
-	      " AND name=".db_encode_str($opt_dhcpclass)." " : "") .
-	     "ORDER BY name",\@dclasses);
-    if (@dclasses > 0) {
-      print DHCPFILE "\n# (dynamic) classes\n\n";
-      for $i (0..$#dclasses) {
-	print DHCPFILE "\nclass \"$dclasses[$i][1]\" {\n";
-	print DHCPFILE "\tmatch pick-first-value " .
-	               "(option host-identifier option dhcp6.client-id);\n"
-			 if ($dclasses[$i][2] == 3);
-	undef @q;
-	db_query("SELECT dhcp FROM dhcp_entries6 " .
-		 "WHERE type=5 and ref=$dclasses[$i][0] ORDER BY id",\@q);
-	for $j (0..$#q) {
-	    $q[$j][0].=';' unless ($q[$j][0] =~ /[;\{\}]\s*$/);
-	    print DHCPFILE "\t$q[$j][0]\n";
-	}
-	print DHCPFILE "}\n";
-
-	# subclasses
-	if ($dclasses[$i][2]== 3) {
-	  my $lastduid;
-	  undef @q;
-	  db_query("SELECT h.duid,h.domain " .
-		   "FROM zones z JOIN hosts h ON z.id=h.zone " .
-		   " LEFT JOIN group_entries g ON h.id=g.host " .
-		   "WHERE z.server=$serverid AND h.duid NOTNULL " .
-		   " AND (h.grp=$dclasses[$i][0] OR g.grp=$dclasses[$i][0]) " .
-		   "ORDER BY h.duid",\@q);
-	  for $j (0..$#q) {
-	    unless ($q[$j][0] =~ /^[a-f0-9A-F]{4}$/) {
-	      #error("invalid duid for subclass: $q[$j][0]");
-	      next;
-	    }
-	    next if ($q[$j][0] eq $lastduid);
-	    print DHCPFILE "subclass \"$dclasses[$i][1]\" 1:" .
-	                   $q[$j][0] .  ";  # $q[$j][1]\n";
-	    $lastduid=$q[$j][0];
-	  }
-	}
-
-      }
-      print DHCPFILE "\n";
-    }
-
-    goto dhcpd_conf_done if ($opt_dhcpclass);
-  }
-
+#  unless ($dhcp2_mode) {
+#  print_dhcp_classes:
+#    undef @dclasses;
+#    db_query("SELECT id,name,type FROM groups " .
+#	     "WHERE server=$serverid AND (type=3 OR type=103) " .
+#	     ($opt_dhcpclass ?
+#	      " AND name=".db_encode_str($opt_dhcpclass)." " : "") .
+#	     "ORDER BY name",\@dclasses);
+#    if (@dclasses > 0) {
+#      print DHCPFILE "\n# (dynamic) classes\n\n";
+#      for $i (0..$#dclasses) {
+#	print DHCPFILE "\nclass \"$dclasses[$i][1]\" {\n";
+#	print DHCPFILE "\tmatch pick-first-value " .
+#	               "(option host-identifier option dhcp6.client-id);\n"
+#			 if ($dclasses[$i][2] == 3);
+#	undef @q;
+#	db_query("SELECT dhcp FROM dhcp_entries6 " .
+#		 "WHERE type=5 and ref=$dclasses[$i][0] ORDER BY id",\@q);
+#	for $j (0..$#q) {
+#	    $q[$j][0].=';' unless ($q[$j][0] =~ /[;\{\}]\s*$/);
+#	    print DHCPFILE "\t$q[$j][0]\n";
+#	}
+#	print DHCPFILE "}\n";
+#
+#	# subclasses
+#	if ($dclasses[$i][2]== 3) {
+#      my $lastduid;
+#	  undef @q;
+#	  db_query("SELECT h.duid,h.domain " .
+#		   "FROM zones z JOIN hosts h ON z.id=h.zone " .
+#		   " LEFT JOIN group_entries g ON h.id=g.host " .
+#		   "WHERE z.server=$serverid AND h.duid NOTNULL " .
+#		   " AND (h.grp=$dclasses[$i][0] OR g.grp=$dclasses[$i][0]) " .
+#		   "ORDER BY h.duid",\@q);
+#	  for $j (0..$#q) {
+#	    unless ($q[$j][0] =~ /^[a-f0-9A-F]{4}$/) {
+#	      #error("invalid duid for subclass: $q[$j][0]");
+#	      next;
+#	    }
+#	    next if ($q[$j][0] eq $lastduid);
+#	    print DHCPFILE "subclass \"$dclasses[$i][1]\" 1:" .
+#	                   $q[$j][0] .  ";  # $q[$j][1]\n";
+#	    $lastduid=$q[$j][0];
+#	  }
+#	}
+#
+#      }
+#      print DHCPFILE "\n";
+#    }
+#
+#    goto dhcpd_conf_done if ($opt_dhcpclass);
+#  }
+#
 
   # check for dynamic IP pools
   undef @dpools;
@@ -2020,7 +2020,7 @@ sub make_dhcp6() {
   }
 
   # net/subnet map
-  $net_map_mode= 2;  # 0=use VLANs, 1=use networks, 2= use VLANs, pools included
+  $net_map_mode= 2;  # 0=use VLANs, 1=use networks, 2= use VLANs, pools in nets
 
   print DHCPFILE "\n# network map\n\n";
   undef @subnets;
