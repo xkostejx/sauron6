@@ -950,12 +950,15 @@ if ($bind_conf) {
       # normal host entries
       undef @q;
       undef %dnames;
+    
+      my $ign_local = ($opt_ign_local ? "AND NOT (a.ip << '10.0.0.0/8') AND NOT (a.ip << '172.16.0.0/12') AND NOT (a.ip << '192.168.0.0/16')" : ""); 
+
       db_query("SELECT h.domain,a.ip,h.hinfo_hw,h.hinfo_sw,h.ttl,h.huser, " .
 	       " h.dept,h.location,h.info,h.mx,h.expiration " .
 	       "FROM hosts h, a_entries a, zones z " .
 	       "WHERE h.zone=z.id AND a.host=h.id " .
 	       "AND z.id=$zoneid AND h.type=1 " .
-	       "AND a.forward=true AND h.domain <> '\@' " .
+	       "AND a.forward=true AND h.domain <> '\@' $ign_local " .
 	       "ORDER BY a.ip,h.domain;",\@q);
       error(db_errormsg()) if (db_errormsg());
       if (@q > 0) {
@@ -2714,9 +2717,9 @@ sub make_printcap() {
 
 $VER = sauron_version();
 
-$result=GetOptions("help|h","all|a","bind|b","dhcp|d","dhcp6","printer|p","mail",
+$result=GetOptions("help|h","all|a","bind|b","dhcp|d","dhcp_v6","printer|p","mail",
 		   "updateserial","noupdateserial","verbose","dhcp2","clean",
-		   "check","dhcpclass=s","dhcpvlans=s","tinydns|t");
+		   "check","dhcpclass=s","dhcpvlans=s","tinydns|t", "ignorelocal|i");
 
 if ($opt_help || @ARGV < 1 || $result < 1) {
     print "syntax: $0 [--help] [options] <servername> [<target directory>]\n";
@@ -2725,10 +2728,11 @@ if ($opt_help || @ARGV < 1 || $result < 1) {
       "\t--bind               generate BIND (named) configuration files\n",
       "\t--tinydns            generate DJBDNS (tinydns) configuration files\n",
       "\t--dhcp               generate DHCP (dhcpd) configuration files\n",
-      "\t--dhcp6              generate DHCP6 (dhcpd) configuration files\n",
+      "\t--dhcp_v6            generate DHCP6 (dhcpd) configuration files\n",
       "\t--clean              cleanup expired records and vacuum database\n",
       "\t--printer            generate PRINTER (lpd) configuration files\n\n",
       "\t--updateserial       force serial update on master zones\n\n",
+      "\t--ignorelocal        force ignore RFC1918 subnets\n\n",
       "\t--check              check validity of generated dhcp.conf,named.conf,\n",
       "\t                     and zone files\n\n",
       "\t--dhcp2              enable DHCPv2 compatibilty mode\n",
@@ -2743,7 +2747,7 @@ if ($opt_help || @ARGV < 1 || $result < 1) {
 $opt_verbose=($opt_verbose ? 1 : 0);
 $opt_clean=($opt_clean ? 1 : 0);
 $opt_dhcp=($opt_dhcp ? 1 : 0);
-$opt_dhcp6=($opt_dhcp6 ? 1 : 0);
+$opt_dhcp6=($opt_dhcp_v6 ? 1 : 0);
 $opt_bind=($opt_bind ? 1 : 0);
 $opt_tinydns=($opt_tinydns ? 1 : 0);
 $opt_printer=($opt_printer ? 1 : 0);
@@ -2751,7 +2755,7 @@ $opt_dhcp2=($opt_dhcp2 ? 1 : 0);
 $opt_updateserial=($opt_updateserial ? 1 : 0);
 $opt_noupdateserial=($opt_noupdateserial ? 1 : 0);
 $opt_check=($opt_check ? 1 : 0);
-
+$opt_ign_local = ($opt_ignorelocal ? 1 : 0);
 $dhcp6_conf=1 if ($opt_dhcp6 || $opt_all);
 $dhcp_conf=1 if ($opt_dhcp || $opt_all);
 $bind_conf=1 if ($opt_bind || $opt_all);
