@@ -2504,9 +2504,10 @@ sub print_subnets6() {
                 $line = "range6 " . ($b eq $e ? "$b" : "$b $e") .";";
                 if ($net_map_mode == 2) {
                     print DHCPFILE "\t\t$line\n";
-                    for $x (0..$#{$dpools_dhcp{$k}}) {
-                        print DHCPFILE "\t\t\t${$dpools_dhcp{$k}}[$x];\n";
-                    }
+                    #Not in pool, prepared for future;)
+                    #for $x (0..$#{$dpools_dhcp{$k}}) {
+                    #    print DHCPFILE "\t\t\t${$dpools_dhcp{$k}}[$x];\n";
+                    #}
                 }
                 else {
                     push @{$lst}, $line;
@@ -2524,9 +2525,9 @@ sub print_subnets6() {
                   $line = "range6 " . ($b eq $e ? "$b" : "$b $e") .";";
                   if ($net_map_mode == 2) {
                     print DHCPFILE "\t\t$line\n";
-                    for $x (0..$#{$dpools_dhcp{$k}}) {
-                        print DHCPFILE "\t\t\t${$dpools_dhcp{$k}}[$x];\n";
-                    }
+                    #for $x (0..$#{$dpools_dhcp{$k}}) {
+                    #    print DHCPFILE "\t\t\t${$dpools_dhcp{$k}}[$x];\n";
+                    #}
                   }
                   else {
                       push @{$lst}, $line;
@@ -2543,9 +2544,9 @@ sub print_subnets6() {
             $line = "range6 " . ($b eq $e ? "$b" : "$b $e") .";";
             if ($net_map_mode == 2) {
                 print DHCPFILE "\t\t$line\n";
-                for $x (0..$#{$dpools_dhcp{$k}}) {
-                    print DHCPFILE "\t\t\t${$dpools_dhcp{$k}}[$x];\n";
-                }
+                #for $x (0..$#{$dpools_dhcp{$k}}) {
+                #    print DHCPFILE "\t\t\t${$dpools_dhcp{$k}}[$x];\n";
+                #}
             }
             else
             {
