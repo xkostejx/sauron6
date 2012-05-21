@@ -240,7 +240,11 @@ if ($bind_conf) {
     print BINDFILE "\tcheck-names response $val;\n" if ($val ne '');
 
     print BINDFILE "\n\ttransfer-source $server{transfer_source};\n"
-      if (is_cidr($server{transfer_source}));
+      if (is_cidr($server{transfer_source}) && ip_is_ipv4($server{transfer_source}));
+    
+    print BINDFILE "\n\ttransfer-source-v6 $server{transfer_source};\n"
+      if (is_cidr($server{transfer_source}) && ip_is_ipv6($server{transfer_source}));
+
     if ($server{query_src_ip} || $server{query_src_port} > 0) {
       $val="address " .
            (is_cidr($server{query_src_ip}) ? $server{query_src_ip} : '*') .
