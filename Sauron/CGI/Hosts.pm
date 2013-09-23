@@ -92,6 +92,9 @@ my %host_form = (
    empty=>1, type=>'domain', len=>30, iff=>['type','1'] },
   {ftype=>1, tag=>'duid', name=>'DUID', type=>'duid', len=>40,
    conv=>'U', iff=>['type','([19]|101)'], empty=>1},
+   {ftype=>1, tag=>'iaid', name=>'IAID', type=>'iaid', len=>11,
+   conv=>'U', iff=>['type','([19]|101)'], empty=>1, extrahex=>8},
+
   {ftype=>1, tag=>'asset_id', name=>'Asset ID', type=>'text', len=>20,
    empty=>1, no_empty=>1, chr=>1, iff=>['type','1']},
   {ftype=>1, tag=>'model', name=>'Model', type=>'text', len=>50, empty=>1,
@@ -181,7 +184,7 @@ my %restricted_host_form = (
    addempty=>$hinfo_addempty_mode, empty=>1, iff=>['type','[19]']},
   {ftype=>1, tag=>'ether', name=>'Ethernet address', type=>'mac', len=>17,
    conv=>'U', iff=>['type','[19]'], iff2=>['ether_alias_info',''],
-   {ftype=>1, tag=>'duid', name=>'DUID', type=>'duid', len=>40,
+   {ftype=>1, tag=>'duid', name=>'DUID3', type=>'duid', len=>40,
    conv=>'U', iff=>['type','([19]|101)'], empty=>1},
 
    empty=>$main::SAURON_RHF{ether}},
@@ -278,9 +281,10 @@ my %new_host_form = (
    addempty=>$hinfo_addempty_mode, empty=>1, iff=>['type','1']},
   {ftype=>1, tag=>'ether', name=>'Ethernet address', type=>'mac', len=>17,
    conv=>'U', iff=>['type','(1|9|101)'], empty=>1},
-  {ftype=>1, tag=>'duid', name=>'DUID', type=>'duid', len=>40,
+  {ftype=>1, tag=>'duid', name=>'DUID2', type=>'duid', len=>40,
    conv=>'U', iff=>['type','([19]|101)'], empty=>1},
-
+  {ftype=>1, tag=>'iaid', name=>'IAID', type=>'iaid', len=>10,
+   conv=>'U', iff=>['type','([19]|101)'], empty=>1},
 
   {ftype=>1, tag=>'asset_id', name=>'Asset ID', type=>'text', len=>20,
    empty=>1, no_empty=>1, chr=>1, iff=>['type','1']},
@@ -394,12 +398,11 @@ my %csv_timestamp=(1=>'Unix [epoch]',2=>'Standard [US]',
 my @csv_timestamp_f=('epoch','us-std','excel','iso8601:2004','rfc822date');
 
 my %browse_page_size=(0=>'25',1=>'50',2=>'100',3=>'256',4=>'512',5=>'1000');
-my %browse_search_fields=(0=>'Ether',9=>'DUID',1=>'Info',2=>'User',3=>'Location',
-			  4=>'Department',5=>'Model',6=>'Serial',7=>'Misc',
-			  8=>'Asset ID',
+my %browse_search_fields=(0=>'Ether', 1=>'DUID', 2=>'Info',3=>'User',4=>'Location',
+			  5=>'Department',6=>'Model',7=>'Serial',8=>'Misc', 9=>'Asset ID', 10=>'IAID',
 			  -1=>'<ANY>');
-my @browse_search_f=('ether','info','huser','location','dept','model',
-		  'serial','misc','asset_id','duid');
+my @browse_search_f=('ether','duid', 'info','huser','location','dept','model',
+		  'serial','misc','asset_id', 'iaid');
 my %browse_search_datefields=(0=>'Last lease (DHCP)',1=>'Last seen (DHCP)',
 			      2=>'Creation',3=>'Modification',4=>'Expiration');
 my @browse_search_df=('dhcp_date','dhcp_last','cdate','mdate','expiration');
@@ -804,11 +807,24 @@ sub menu_handler {
 		$useInet6 = 1 if ip_is_ipv6($host{ip}[$i][1]) and param("h_ip_".$i."_del") ne "on";
       	  }
 
+
+      #Asi nebudeme vynucovat DUID, IAID apod. pro IPv6, muze to byt pouze registrace hostname      
 	
-	  if($useInet6 == 0 and $host{duid} ne ""){
-	  	alert2("IPv6 address not set -> empty DUID required!");
-                $update_ok = 0;
-	  }
+	  #if($useInet6 == 0 and $host{duid} ne ""){
+	  #	alert2("IPv6 address not set -> empty DUID required!");
+      #          $update_ok = 0;
+	  #}
+
+      #if($useInet6 == 0 and $host{iaid} ne ""){
+      #  alert2("IPv6 address not set -> empty IAID required!");
+      #          $update_ok = 0;
+      #}
+
+      #if($useInet6 == 1 and $host{iaid} ne "" and $host{duid} eq ""){
+      #  alert2("DUID not set -> non empty DUID required!");
+      #          $update_ok = 0;
+      #}
+
 
 	  if ($update_ok) {
 	    $host{ether_alias}=-1 if ($host{ether});
@@ -832,7 +848,9 @@ sub menu_handler {
 			      "ether: $oldhost{ether} --> $host{ether} ":"") .
 			     ($host{duid} ne $oldhost{duid} ?
 			      "DUID: $oldhost{duid} --> $host{duid} ":"") .
-			     ($host{ip}[1][1] ne $old_ips[1] ?
+			     ($host{iaid} ne $oldhost{iaid} ?
+			      "DUID: $oldhost{iaid} --> $host{iaid} ":"") .
+                  ($host{ip}[1][1] ne $old_ips[1] ?
 			      "ip: $old_ips[1] --> $host{ip}[1][1] ":""),
 			     $host{id});
 	      print h2("Host record succesfully updated.");
@@ -1024,6 +1042,7 @@ sub menu_handler {
     elsif (param('bh_order') == 3) { $sorder='6,1'; }
     elsif (param('bh_order') == 4) { $sorder='7,8,1'; }
     elsif (param('bh_order') == 5) { $sorder='13,1'; }
+    elsif (param('bh_order') == 6) { $sorder='14,1'; }
     else { $sorder='1,5'; }
 
     #if (param('bh_cidr') || param('bh_net') ne 'ANY') {
@@ -1043,16 +1062,33 @@ sub menu_handler {
 	#print "<br>ether=$tmp2";
       }
       elsif ($tmp eq 'duid') {
-	$tmp2 = "\U$tmp2";
-	$tmp2 =~ s/[^0-9A-F]//g;
-	print "Searching for DUID pattern '$tmp2'<br><br>"
-	  if (param('bh_pattern') =~ /[^A-Fa-f0-9:\-\ ]/);
-	#print "<br>ether=$tmp2";
+          $tmp2 = "\U$tmp2";
+          $tmp2 =~ s/[^0-9A-F]//g;
+          print "Searching for DUID pattern '$tmp2'<br><br>";
       }
+      elsif ($tmp eq 'iaid') {
+          $tmp2 = "\U$tmp2";
+          $tmp2 =~ s/[^0-9A-F]//g;
+         
+          if($tmp2 !~ /^\d+$/) {
+              $tmp2 = hex($tmp2) if ($tmp2 !~ /^\d+$/ and $tmp2 ne "");
+          } 
+                
+          if(($tmp2 > 0) and ($tmp2 < (2**32))) { 
+              my $tmp2hex = sprintf("(0x%08x)", $tmp2);
+              print "Searching for IAID pattern '$tmp2' $tmp2hex <br><br>";
+          }
+          else {
+              alert2("Invalid pattern for IAID!");
+              goto browse_hosts;
+          }
+      }
+
 
       $tmp2=db_encode_str($tmp2);
       if ($tmp) {
-	$extrarule=" AND a.$tmp ~* $tmp2 ";
+    #Becouse IAID is a number in DB
+	$extrarule= ($tmp ne "iaid" ? " AND a.$tmp ~* $tmp2 " : " AND a.$tmp = $tmp2 ");
 	#print p,$extrarule;
       } else {
 	$extrarule= " AND (a.location ~* $tmp2 OR a.huser ~* $tmp2 " .
@@ -1083,7 +1119,7 @@ sub menu_handler {
 
     undef @q;
     my $fields="a.id,a.type,a.domain,a.ether,a.info,a.huser,a.dept," .
-	    "a.location,a.expiration,a.ether_alias, a.duid";
+	    "a.location,a.expiration,a.ether_alias, a.duid, a.iaid";
     $fields.=",a.cdate,a.mdate,a.expiration,a.dhcp_date," .
              "a.hinfo_hw,a.hinfo_sw,a.model,a.serial,a.misc,a.asset_id"
 	       if (param('csv'));
@@ -1110,6 +1146,7 @@ sub menu_handler {
     #print "<br>$sql";
    
 
+    #print $sql . "\n";
     db_query($sql,\@q);
     my $count=scalar @q;
     if ($count < 1) {
@@ -1120,7 +1157,7 @@ sub menu_handler {
     #print "\n",url(-path_info=>1,-query=>1),"\n";
 
     if (param('csv')) {
-      printf print_csv(['Domain','Type','IP','Ether','DUID', 'User','Dept.',
+      printf print_csv(['Domain','Type','IP','Ether','DUID', 'IAID', 'User','Dept.',
 	                 'Location','Info','Hardware','Software',
 			 'Model','Serial','Misc','AssetID',
 			 'cdate','mdate','edate','dhcpdate'],1) . "\n";
@@ -1131,13 +1168,13 @@ sub menu_handler {
 	$q[$i][5]=dhcpether($q[$i][5])
 	  unless (dhcpether($q[$i][5]) eq '00:00:00:00:00:00');
 	printf print_csv([ $q[$i][4],$host_types{$q[$i][3]},$q[$i][0],
-	                   $q[$i][5],$q[$i][12], $q[$i][7],$q[$i][8],$q[$i][9],
-			   $q[$i][6],$q[$i][17],$q[$i][18],
-			   $q[$i][19],$q[$i][20],$q[$i][21],$q[$i][22],
-			   utimefmt($q[$i][13],$csv_fmt),
+	                   $q[$i][5],$q[$i][12],$q[$i][13], $q[$i][7],$q[$i][8],$q[$i][9],
+			   $q[$i][6],$q[$i][18],$q[$i][19],
+			   $q[$i][20],$q[$i][21],$q[$i][22],$q[$i][23],
 			   utimefmt($q[$i][14],$csv_fmt),
 			   utimefmt($q[$i][15],$csv_fmt),
-			   utimefmt($q[$i][16],$csv_fmt)
+			   utimefmt($q[$i][16],$csv_fmt),
+			   utimefmt($q[$i][17],$csv_fmt)
 			 ],1) . "\n";
       }
 
@@ -1198,6 +1235,7 @@ sub menu_handler {
 	  "<a href=\"$sorturl&bh_order=2\">IP</a>",
 	  "<a href=\"$sorturl&bh_order=3\">Ether</a>",
 	  "<a href=\"$sorturl&bh_order=5\">DUID</a>",
+	  "<a href=\"$sorturl&bh_order=6\">IAID</a>",
 	  "<a href=\"$sorturl&bh_order=4\">Info</a>"]);
 
     for $i (0..$#q) {
@@ -1212,7 +1250,17 @@ sub menu_handler {
       $ether='<font color="#990000">N/A</a>' unless($ether);
       my $duid = $q[$i][12];
       $duid = '<font color="#990000">N/A</a>' unless($duid);
-      
+      my $iaid = $q[$i][13];      
+      my $iaidhex;
+ 
+      unless($iaid) {
+        $iaid = '<font color="#990000">N/A</a>';
+        $iaidhex = '';
+      } 
+      else {
+        $iaidhex = sprintf("(0x%08x)", $iaid);
+      }
+
       my $hostname="<A HREF=\"$selfurl?menu=hosts&h_id=$q[$i][2]\">".
 	        "$q[$i][4]</A>";
       my $info = join_strings(', ',(@{$q[$i]})[6,7,8,9]);
@@ -1240,6 +1288,7 @@ sub menu_handler {
 		"<FONT size=-1>$host_types{$q[$i][3]}</FONT>",$ip,
 	        "<font size=-3 face=\"courier\">$ether&nbsp;</font>",
 	        "<font size=-3 face=\"courier\">$duid&nbsp;</font>",
+	        "<font size=-3 face=\"courier\">$iaid $iaidhex</font>",
 	        "<FONT size=-1>".$info."&nbsp;</FONT>"]),"</TR>";
 
     }
@@ -1439,6 +1488,16 @@ sub menu_handler {
                   "<a href=\"$selfurl?menu=hosts&h_id=$q[0][0]\">$q[0][1]</a>";
               }
             }
+          elsif(db_lasterrormsg() =~ /duid_iaid_key/) {
+              alert2("Duplicate DUID+IAID $data{duid} - $data{'iaid'}");
+              db_query("SELECT id,domain FROM hosts " .
+                       "WHERE duid='$data{duid}' AND iaid='$data{'iaid'}' AND zone=$zoneid",\@q);
+              if ($q[0][0] > 0) {
+                print "Conflicting host: ",
+                  "<a href=\"$selfurl?menu=hosts&h_id=$q[0][0]\">$q[0][1]</a>";
+              }
+            }
+
 		else {
 	      alert2(db_lasterrormsg());
 	    }
@@ -1464,6 +1523,7 @@ sub menu_handler {
     delete $data{ip};
     delete $data{ether};
     delete $data{duid};
+    delete $data{iaid};
     delete $data{serial};
     delete $data{asset_id};
     $data{ip}=$host{ip}[1][1];
@@ -1514,7 +1574,7 @@ sub menu_handler {
       if ($host{type} == 1 && $main::SAURON_TRACEROUTE_PROG &&
 	  !check_perms('level',$main::ALEVEL_TRACEROUTE,1));
     print "</td></tr></table>";
-
+   
     display_form(\%host,\%host_form);
     unless (check_perms('zone','RW',1)) {
       print submit(-name=>'sub',-value=>'Edit'), " ",

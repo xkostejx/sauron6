@@ -172,10 +172,11 @@ sub form_check_field($$$) {
   } elsif ($type eq 'bool') {
     return 'boolean value required!' unless ($value =~ /^(t|f)$/);
   } elsif ($type eq 'mac') { 
-    return 'Ethernet address required!' if ($value !~ /^([0-9A-F]{12})$/ and $inetFamily4);
+    return 'Ethernet address required!' if ($value !~ /^([0-9A-Fa-f]{12})$/ and $inetFamily4);
   } elsif ($type eq 'duid') {
-   # return 'IPv6 address not set -> empty DUID required!' if ($value ne "" and not defined $inetFamily6);
-    return 'Valid DUID required!' if ($value !~ /^([0-9A-F]{4})$/ and $inetFamily6);
+    return 'Valid DUID required!' if ($value !~ /^([0-9A-Fa-f]{1,40})$/ and $inetFamily6);
+  } elsif ($type eq 'iaid') {
+    return 'Valid IAID required!' if !(($value > 0) and ($value < (2**32))) and $inetFamily6;
   } elsif ($type eq 'printer_class') {
     return 'Valid printer class name required!'
       unless ($value =~ /^\@[a-zA-Z]+$/);
@@ -262,9 +263,12 @@ sub form_check_form($$$) {
     #print "<br>check $p,$type";
 
     if ($type == 1) {
-      if ($rec->{type} eq 'mac' or $rec->{type} eq 'duid') {
+      if ($rec->{type} eq 'mac' or $rec->{type} eq 'duid' or $rec->{type} eq "iaid") {
 	$val="\U$val";
 	$val =~ s/[\s:\-\.]//g;
+
+    #IAID in HEX will be converted to DEC
+    $val = hex($val) if $rec->{type} eq "iaid" and ($val !~ /^\d+$/ and $val ne "");
       } elsif ($rec->{type} eq 'textarea') {
 	#$val =~ s/\r//g;
 	#$val =~ s/\n/\\n/g;
@@ -655,7 +659,8 @@ sub form_magic($$$) {
 	}
 	else {
 	  $n=$p2."_3";
-	  print td(checkbox(-label=>' A',-name=>$n,-checked=>param($n)));
+	  print td(checkbox(-label=>' A',-name=>$n,-checked=>param($n))) if ip_is_ipv4(param($p2 . "_1"));
+	  print td(checkbox(-label=>' AAAA',-name=>$n,-checked=>param($n))) if ip_is_ipv6(param($p2 . "_1"));
 	  $n=$p2."_2";
 	  print td(checkbox(-label=>' PTR',-name=>$n,-checked=>param($n)));
 
@@ -995,6 +1000,7 @@ sub display_form($$) {
       next if ($rec->{no_empty} && $val eq '');
 
       $val =~ s/\/32$// if ($rec->{type} eq 'ip');
+      $val = $val . sprintf(" (0x%0" . $rec->{extrahex} . "x)", $val) if ($rec->{extrahex} and $val ne "");
       if ($rec->{type} eq 'expiration') {
 	unless ($val > 0) {
 	  $val = '<FONT color="blue">NO expiration date set</FONT>';
@@ -1052,7 +1058,8 @@ sub display_form($$) {
 	$ip=~ s/\/\d{1,2}$//g;
 	$ipinfo='';
 	$ipinfo.=' (no reverse)' if ($$a[$j][2] ne 't' && $$a[$j][2] != 1);
-	$ipinfo.=' (no A record)' if ($$a[$j][3] ne 't' && $$a[$j][3] != 1);
+	$ipinfo.=' (no A record)' if ($$a[$j][3] ne 't' && $$a[$j][3] != 1 and ip_is_ipv4($ip));
+	$ipinfo.=' (no AAAA record)' if ($$a[$j][3] ne 't' && $$a[$j][3] != 1 and ip_is_ipv6($ip));
 	print Tr(td($ip),td($ipinfo));
       }
       print "</TABLE></TD>";
