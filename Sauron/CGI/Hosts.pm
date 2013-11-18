@@ -281,7 +281,7 @@ my %new_host_form = (
    addempty=>$hinfo_addempty_mode, empty=>1, iff=>['type','1']},
   {ftype=>1, tag=>'ether', name=>'Ethernet address', type=>'mac', len=>17,
    conv=>'U', iff=>['type','(1|9|101)'], empty=>1},
-  {ftype=>1, tag=>'duid', name=>'DUID2', type=>'duid', len=>40,
+  {ftype=>1, tag=>'duid', name=>'DUID', type=>'duid', len=>40,
    conv=>'U', iff=>['type','([19]|101)'], empty=>1},
   {ftype=>1, tag=>'iaid', name=>'IAID', type=>'iaid', len=>10,
    conv=>'U', iff=>['type','([19]|101)'], empty=>1},

@@ -3468,6 +3468,7 @@ sub load_state($$) {
   $state->{'auth'}='no';
   $state->{'cookie'}=$id;
 
+
   db_query("SELECT uid,addr,auth,mode,serverid,server,zoneid,zone," .
 	   " uname,last,login,searchopts,searchdomain,searchpattern," .
            " superuser,sid " .
@@ -3477,6 +3478,7 @@ sub load_state($$) {
     $state->{'uid'}=$q[0][0];
     $state->{'addr'}=$q[0][1];
     $state->{'addr'} =~ s/\/32\s*$//;
+    $state->{'addr'} =~ s/\/128\s*$//;
     $state->{'auth'}='yes' if ($q[0][2] eq 't' || $q[0][2] == 1);
     $state->{'mode'}=$q[0][3];
     if ($q[0][4] > 0) {
