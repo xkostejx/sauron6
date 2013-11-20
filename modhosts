@@ -99,8 +99,12 @@ if ($opt_setedate) {
 }
 
 if ($opt_setgroup) {
-    fatal("cannot find group '$opt_setgroup'")
-	if (($gid=get_group_by_name($serverid,$opt_setgroup)) < 0);
+    if($opt_setgroup eq "NONE") {
+        $gid = -1;
+    }
+    else {
+        fatal("cannot find group '$opt_setgroup'") if (($gid=get_group_by_name($serverid,$opt_setgroup)) < 0);
+    }
 }
 
 if ($opt_type) {
