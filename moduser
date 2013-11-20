@@ -60,7 +60,7 @@ sub list_privs($$) {
 	   "ORDER BY b.name",\@d);
   for $i (0..$#d) {
     $d[$i][0] =~ s/\s+$//;
-    printf "%-6s %-8s %-25s %s\n",$d[$i][2],"server",$d[$i][1],$d[$i][0];
+    printf "%-6s %-8s %-44s %s\n",$d[$i][2],"server",$d[$i][1],$d[$i][0];
   }
 
   db_query("SELECT a.rule,c.name||':'||b.name,a.id " .
@@ -69,7 +69,7 @@ sub list_privs($$) {
 	   " a.ref=$id AND a.type=$utype ORDER BY b.name",\@d);
   for $i (0..$#d) {
     $d[$i][0] =~ s/\s+$//;
-    printf "%-6s %-8s %-25s %s\n",$d[$i][2],"zone",$d[$i][1],$d[$i][0];
+    printf "%-6s %-8s %-44s %s\n",$d[$i][2],"zone",$d[$i][1],$d[$i][0];
   }
 
   db_query("SELECT a.rule,b.net,a.id,c.name " .
@@ -78,7 +78,7 @@ sub list_privs($$) {
            "  AND a.ref=$id AND a.type=$utype ORDER BY b.net",\@d);
   for $i (0..$#d) {
     $d[$i][0] =~ s/\s+$//;
-    printf "%-6s %-8s %-25s %s\n",$d[$i][2],"net",$d[$i][3].':'.$d[$i][1],
+    printf "%-6s %-8s %-44s %s\n",$d[$i][2],"net",$d[$i][3].':'.$d[$i][1],
       '(IP constraint)';
   }
 
@@ -90,7 +90,7 @@ sub list_privs($$) {
 	   "WHERE a.rtype=4 AND a.ref=$id AND a.type=$utype ORDER BY id",\@d);
   for $i (0..$#d) {
     $d[$i][0] =~ s/\s+$//;
-    printf "%-6s %-8s %-25s %s\n",$d[$i][1],"hostmask",
+    printf "%-6s %-8s %-44s %s\n",$d[$i][1],"hostmask",
       ($d[$i][2] ? $d[$i][2] .":" : "") . $d[$i][0] ,
       "(hostname constraint)";
   }
@@ -99,7 +99,7 @@ sub list_privs($$) {
 	   "WHERE a.rtype=5 AND a.ref=$id AND a.type=$utype ORDER BY id",\@d);
   for $i (0..$#d) {
     $d[$i][0] =~ s/\s+$//;
-    printf "%-6s %-8s %-25s %s\n",$d[$i][1],"IP-mask",$d[$i][0],
+    printf "%-6s %-8s %-44s %s\n",$d[$i][1],"IP-mask",$d[$i][0],
       "(IP constraint)";
   }
 
@@ -107,7 +107,7 @@ sub list_privs($$) {
 	   "WHERE a.rtype=6 AND a.ref=$id AND a.type=$utype ORDER BY id",\@d);
   for $i (0..$#d) {
     $d[$i][0] =~ s/\s+$//;
-    printf "%-6s %-8s %-25s %s\n",$d[$i][1],"Level",$d[$i][0],
+    printf "%-6s %-8s %-44s %s\n",$d[$i][1],"Level",$d[$i][0],
       "(privilege level)";
   }
 
@@ -115,7 +115,7 @@ sub list_privs($$) {
 	   "WHERE a.rtype=7 AND a.ref=$id AND a.type=$utype ORDER BY id",\@d);
   for $i (0..$#d) {
     $d[$i][0] =~ s/\s+$//;
-    printf "%-6s %-8s %-25s %s\n",$d[$i][1],"ELimit",$d[$i][0],
+    printf "%-6s %-8s %-44s %s\n",$d[$i][1],"ELimit",$d[$i][0],
       "(expiration limit)";
   }
 
@@ -123,7 +123,7 @@ sub list_privs($$) {
 	   "WHERE a.rtype=8 AND a.ref=$id AND a.type=$utype ORDER BY id",\@d);
   for $i (0..$#d) {
     $d[$i][0] =~ s/\s+$//;
-    printf "%-6s %-8s %-25s %s\n",$d[$i][1],"DefDept",$d[$i][0],
+    printf "%-6s %-8s %-44s %s\n",$d[$i][1],"DefDept",$d[$i][0],
       "(default department string)";
   }
 
@@ -131,7 +131,7 @@ sub list_privs($$) {
 	   "WHERE a.rtype=9 AND a.ref=$id AND a.type=$utype ORDER BY id",\@d);
   for $i (0..$#d) {
     $d[$i][0] =~ s/\s+$//;
-    printf "%-6s %-8s %-25s %s\n",$d[$i][1],"TmplMask",$d[$i][0],
+    printf "%-6s %-8s %-44s %s\n",$d[$i][1],"TmplMask",$d[$i][0],
       "(Template mask)";
   }
 
@@ -139,7 +139,7 @@ sub list_privs($$) {
 	   "WHERE a.rtype=10 AND a.ref=$id AND a.type=$utype ORDER BY id",\@d);
   for $i (0..$#d) {
     $d[$i][0] =~ s/\s+$//;
-    printf "%-6s %-8s %-25s %s\n",$d[$i][1],"GrpMask",$d[$i][0],
+    printf "%-6s %-8s %-44s %s\n",$d[$i][1],"GrpMask",$d[$i][0],
       "(Group mask)";
   }
 
@@ -151,7 +151,7 @@ sub list_privs($$) {
           "WHERE a.rtype=11 AND a.ref=$id AND a.type=$utype ORDER BY id",\@d);
   for $i (0..$#d) {
     $d[$i][0] =~ s/\s+$//;
-    printf "%-6s %-8s %-25s %s\n",$d[$i][1],"Delmask",
+    printf "%-6s %-8s %-44s %s\n",$d[$i][1],"Delmask",
       ($d[$i][2] ? $d[$i][2] .":" : "") . $d[$i][0] ,
       "(Host delete mask)";
   }
@@ -160,7 +160,7 @@ sub list_privs($$) {
 	   "WHERE a.rtype=12 AND a.ref=$id AND a.type=$utype ORDER BY id",\@d);
   for $i (0..$#d) {
     $d[$i][0] =~ s/\s+$//;
-    printf "%-6s %-8s %-25s %s\n",$d[$i][1],"RHF",$d[$i][0],
+    printf "%-6s %-8s %-44s %s\n",$d[$i][1],"RHF",$d[$i][0],
       ($d[$i][2] ? 'optional' : 'required');
   }
 
@@ -168,7 +168,7 @@ sub list_privs($$) {
 	   "WHERE a.rtype=13 AND a.ref=$id AND a.type=$utype ORDER BY id",\@d);
   for $i (0..$#d) {
     $d[$i][0] =~ s/\s+$//;
-    printf "%-6s %-8s %-25s %s\n",$d[$i][1],"Flag",$d[$i][0],
+    printf "%-6s %-8s %-44s %s\n",$d[$i][1],"Flag",$d[$i][0],
            '(privilege flag)';
   }
 }
@@ -430,8 +430,8 @@ if ($modgroup) {
 
 unless (defined $opt_add || defined $opt_del || defined $opt_delall) {
   print
-    "ID     Type     Ref.                      Mode\n",
-    "------ -------- ------------------------- --------------------------------\n";
+    "ID     Type     Ref.                                         Mode\n",
+    "------ -------- -------------------------------------------- ---------------------------\n";
 
   print "[User priviliges]\n" if ($utype == 2);
   list_privs($id,$utype);
