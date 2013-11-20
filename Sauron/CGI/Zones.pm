@@ -79,7 +79,7 @@ my %zone_form = (
   {ftype=>3, tag=>'forward', name=>'Forward', type=>'enum', conv=>'U',
    enum=>{D=>'Default',O=>'Only',F=>'First'}, iff=>['type','F'] },
   {ftype=>1, tag=>'transfer_source', name=>'Transfer-Source (address)',
-   type=>'ip', len=>12, 
+   type=>'ip', len=>39, 
    empty=>1, definfo=>['','Default (from server)'], iff=>['type','S']},
   {ftype=>4, tag=>'serial', name=>'Serial', iff=>['type','M']},
   {ftype=>1, tag=>'refresh', name=>'Refresh', type=>'int', len=>10, 

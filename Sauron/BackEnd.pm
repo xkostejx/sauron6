@@ -601,7 +601,7 @@ sub add_record_sql($$) {
     $flag=1 unless ($flag);
   }
   $sqlstr.=")";
- 
+
   write2log($sqlstr);
 
   return $sqlstr;

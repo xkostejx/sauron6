@@ -465,16 +465,16 @@ sub menu_handler {
     $net{netmask}= ($inetFamily == 4 ? $netrange->mask() : $netrange->prefixlen());
     #$net{hostmask}= $netrange->mask();
     $net{broadcast}= ip_compress_address($netrange->last_ip(), $inetFamily);
-    $net{size}= sprintf("%u",$netrange->size());
+    $net{size}= $netrange->size();
     $net{first}= ip_compress_address(($netrange + 1)->ip(), $inetFamily);
 
     if($inetFamily == 4) {
-    $net{last} = ip_compress_address(($netrange + ($netrange->size() - 2))->ip(), $inetFamily) if $inetFamily == 4;
-    $net{ssize}= $net{size} - 2;
+        $net{last} = ip_compress_address(($netrange + ($netrange->size() - 2))->ip(), $inetFamily) if $inetFamily == 4;
+        $net{ssize}= $net{size} - 2;
     }
     elsif($inetFamily == 6) {
-    $net{last} = ip_compress_address(($netrange + ($netrange->size() - 1))->ip(), $inetFamily) if $inetFamily == 6;
-    $net{ssize}= $net{size} - 1;
+        $net{last} = ip_compress_address(($netrange + ($netrange->size() - 1))->ip(), $inetFamily) if $inetFamily == 6;
+        $net{ssize}= $net{size} - 1;
     }
 
     $net{inusep}=sprintf("%3.0f", ($net{inuse} / $net{size})*100) ."%";
