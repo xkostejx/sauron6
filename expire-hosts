@@ -41,7 +41,7 @@ if ($opt_help || @ARGV < 1) {
     "\t\t\t\tlast <days> days (default: 90)\n",
     "\t--norecord\t\tonly expire hosts with no recorded dhcp activity\n",
     "\t--skipname=<regexp>\t\tskips processing matching hosts\n",
-    "\t--edate=<dd-mm-yyy>\tset hosts to expire on this date (default: now)\n",
+    "\t--edate=<dd-mm-yyyy>\tset hosts to expire on this date (default: now)\n",
     "\t--verbose\t\tdisplay more verbose output\n",
     "\n",
     "\t--commit\t\tcommit changes (w/o this NO changes are made)\n";
@@ -162,6 +162,7 @@ for $i (0..$#q) {
   ($id,$domain,$ether,$etheralias,$expiration,$ddate,$cdate,$mdate,$ip) =
     @{$q[$i]};
 
+
   next if ($etheralias > 0);
   if ($opt_netname) {
     # skip hosts outside IP-ranges in chklist
@@ -181,10 +182,13 @@ for $i (0..$#q) {
 
   $mdate=($cdate > $mdate ? $cdate : $mdate);
   $ddate=0 unless ($ddate > 0);
+  
   next if ($ddate == 0 && not $opt_norecord);
+  print "MDATE:$mdate | DATE2:$date2\n";
   next if ($mdate > $date2); # ignore hosts modified recently
   next if ($expiration > 0 && $expiration <= $etime);
   next unless ($ddate <= $date);
+
 
   if (grep { eval $opt_skipname } ($domain)) {
       print "Skipping host w/  Name '$domain' matching $opt_skipname\n" 

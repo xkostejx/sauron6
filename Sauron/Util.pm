@@ -68,6 +68,8 @@ $VERSION = '$Id: Util.pm,v 1.25 2009/02/05 09:28:30 tjko Exp $ ';
 	     new_serial
 	     decode_daterange_str
 	     utimefmt
+         is_iaid
+         trim
 	    );
 
 
@@ -172,7 +174,7 @@ sub is_cidr($) {
 sub is_ip($) {
   my($ip) = @_;
 
-  return 1 if (is_cidr($ip) && $ip !~ /\/\d{1,2}$/);
+  return 1 if (is_cidr($ip) && $ip !~ /\/\d{1,3}$/);
   return 0;
 }
 
@@ -882,6 +884,27 @@ sub utimefmt($$) {
 
     return (defined($utime_df{$fmt}) ? $utime_df{$fmt}($utime) : $utime);
 }
+
+sub is_iaid($) {
+    my ($iaid) = @_;
+    $iaid =~ s/[^0-9A-F]//g;
+
+    if($iaid !~ /^\d+$/) {
+        $iaid = hex($iaid) if ($iaid !~ /^\d+$/ and $iaid ne "");
+    }
+
+    return ((($iaid > 0) and ($iaid < (2**32))) ? $iaid : 0); 
+}
+
+sub trim($) {
+
+    my ($s) = @_;
+    $s =~ s/^\s+//g;
+    $s =~ s/\s+$//g;
+
+    return $s;
+}
+
 
 1;
 # eof
