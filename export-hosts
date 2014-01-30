@@ -71,7 +71,7 @@ $sql = "SELECT h.id,h.zone,z.name,h.type,h.domain,a.ip,h.ttl,h.class,g.name," .
        " h.router, h.ether, h.ether_alias, eal.ether," . # 18-21
        " h.info, h.location," . # 22-23
        " h.dept, h.huser, h.email, h.model, h.serial, h.misc," . # 24-29
-       " h.asset_id, h.comment " . # 30-31
+       " h.asset_id, h.comment, h.duid, h.iaid " . # 30-33
        "FROM zones z JOIN hosts h ON h.zone=z.id " .
        " LEFT JOIN a_entries a ON h.id=a.host " .
        " LEFT JOIN hosts al ON h.alias=al.id " .
@@ -91,7 +91,7 @@ print STDERR $#q . " host entries found for this server.\n" if ($opt_verbose);
 $lastid=-1;
 
 if ($opt_colnames) {
-    print "domain,type,ip,alias,ether,ttl,groupname,hinfo_hw,hinfo_sw," .
+    print "domain,type,ip,alias,ether,duid,iaid,ttl,groupname,hinfo_hw,hinfo_sw," .
 	  "mx_template,router,id,info,location,department,user,email," .
 	  "serial,misc,asset_id,comment" .
 	  "\n";
@@ -123,8 +123,12 @@ for $i (0..$#q) {
     if ($r[20] > 0) {
 	$ether="(".$r[21].")";
     }
+
+    $duid = $r[32];
+    $iaid = sprintf("%x", $r[33]);
+
     print join(",", 
-	       $domain,$type,$ip,$alias,$ether,$etheralias,
+	       $domain,$type,$ip,$alias,$ether,$duid,$iaid,$etheralias,
 	       $r[6], # ttl
 	       qstr($r[8]), # group
 	       qstr($r[14]),qstr($r[15]), # hinfo hw & sw
