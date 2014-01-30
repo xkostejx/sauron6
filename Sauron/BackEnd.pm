@@ -3368,7 +3368,8 @@ sub get_lastlog($$$) {
      ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)
        = localtime($q[$j][2]);
      $t=sprintf("%02d/%02d/%02d %02d:%02d",$mday,$mon+1,$year%100,$hour,$min);
-     $host=substr($q[$j][6],0,15);
+     #$host=substr($q[$j][6],0,15);
+     $host=$q[$j][6];
      $state=$q[$j][3];
      if ($state < 2) {
        $info="still logged in";
