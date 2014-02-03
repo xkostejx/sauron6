@@ -576,11 +576,11 @@ if (defined $opt_add) {
       $ref=-1;
     }
     elsif ($type==12) {
-      print "Enter Field Name (huser,dept,location,info,ether," .
+      print "Enter Field Name (huser,dept,location,info,ether,duid," .
 	    "asset_id,model,serial,misc): ";
       chomp($tmp = <STDIN>);
       $tmp =~ s/\s+|\s+$//g;
-      unless ($tmp =~ /^(huser|dept|location|info|ether|asset_id|model|serial|misc)$/) {
+      unless ($tmp =~ /^(huser|dept|location|info|ether|duid|asset_id|model|serial|misc)$/) {
 	print "Invalid field name\n"; goto add_i;
       }
       $mode=$tmp;
