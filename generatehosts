@@ -75,13 +75,23 @@ if ($opt_help || @ARGV < 5) {
 	"\t--group=<name>\t\tassign new hosts to given group\n",
 	"\t--info=<user>:<dept>:<location>:<extra>\n\n",
 	"\t--commit\t\tcommit changes (w/o this no changes are made)\n",
-	"\ntags:\n",
+	"\nIPv4 tags:\n",
+    "\n",
 	"\t:IP1:\t\tfirst octet of current IP-number\n",
 	"\t:IP2:\t\tsecond octet of current IP-number\n",
 	"\t:IP3:\t\tthird octet of current IP-number\n",
 	"\t:IP4:\t\tfourth octet of current IP-number\n",
 	"\t:N:\t\tsequence number\n",
+	"\n",
+    "\nIPv6 tags:\n",
+    "\n",
+	"\t:IP1:\t\tfifth hextet of current IP-number\n",
+	"\t:IP2:\t\tsixth hextet of current IP-number\n",
+	"\t:IP3:\t\tseventh hextet of current IP-number\n",
+	"\t:IP4:\t\tninth hextet of current IP-number\n",
+	"\t:N:\t\tsequence number\n",
 	"\n";
+
   print "" if ($opt_help);
   exit(0);
 }
