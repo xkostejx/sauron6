@@ -173,10 +173,10 @@ my %net_info_form=(
   {ftype=>1, tag=>'first', name=>'Start', type=>'int'},
   {ftype=>1, tag=>'last', name=>'End', type=>'int'},
   {ftype=>1, tag=>'ssize', name=>'Usable addresses', type=>'int'},
-  {ftype=>1, tag=>'avail', name=>'Available addresses', type=>'int'},
   {ftype=>0, name=>'Address Usage'},
   {ftype=>1, tag=>'inuse', name=>'Addresses in use', type=>'int'},
   {ftype=>1, tag=>'inusep', name=>'Usage', type=>'int'},
+  {ftype=>1, tag=>'avail', name=>'Available addresses', type=>'int'},
   {ftype=>0, name=>'Routers'},
   {ftype=>1, tag=>'gateways', name=>'Gateway(s)', type=>'text'}
  ],
@@ -195,10 +195,10 @@ my %net_info_form6=(
   {ftype=>1, tag=>'first', name=>'Start', type=>'int'},
   {ftype=>1, tag=>'last', name=>'End', type=>'int'},
   {ftype=>1, tag=>'ssize', name=>'Usable addresses', type=>'int'},
-  {ftype=>1, tag=>'avail', name=>'Available addresses', type=>'int'},
   {ftype=>0, name=>'Address Usage'},
   {ftype=>1, tag=>'inuse', name=>'Addresses in use', type=>'int'},
   {ftype=>1, tag=>'inusep', name=>'Usage', type=>'int'},
+  {ftype=>1, tag=>'avail', name=>'Available addresses', type=>'int'},
   {ftype=>0, name=>'Routers'},
   {ftype=>1, tag=>'gateways', name=>'Gateway(s)', type=>'text'}
  ],
