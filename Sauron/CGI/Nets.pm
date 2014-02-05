@@ -173,6 +173,7 @@ my %net_info_form=(
   {ftype=>1, tag=>'first', name=>'Start', type=>'int'},
   {ftype=>1, tag=>'last', name=>'End', type=>'int'},
   {ftype=>1, tag=>'ssize', name=>'Usable addresses', type=>'int'},
+  {ftype=>1, tag=>'avail', name=>'Available addresses', type=>'int'},
   {ftype=>0, name=>'Address Usage'},
   {ftype=>1, tag=>'inuse', name=>'Addresses in use', type=>'int'},
   {ftype=>1, tag=>'inusep', name=>'Usage', type=>'int'},
@@ -194,6 +195,7 @@ my %net_info_form6=(
   {ftype=>1, tag=>'first', name=>'Start', type=>'int'},
   {ftype=>1, tag=>'last', name=>'End', type=>'int'},
   {ftype=>1, tag=>'ssize', name=>'Usable addresses', type=>'int'},
+  {ftype=>1, tag=>'avail', name=>'Available addresses', type=>'int'},
   {ftype=>0, name=>'Address Usage'},
   {ftype=>1, tag=>'inuse', name=>'Addresses in use', type=>'int'},
   {ftype=>1, tag=>'inusep', name=>'Usage', type=>'int'},
@@ -477,6 +479,7 @@ sub menu_handler {
         $net{ssize}= $net{size} - 1;
     }
 
+    $net{avail} = $net{ssize}- $net{inuse};
     $net{inusep}=sprintf("%3.0f", ($net{inuse} / $net{size})*100) ."%";
 
     print "<TABLE width=\"100%\"><TR><TD valign=\"top\">";
