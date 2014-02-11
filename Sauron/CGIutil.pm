@@ -46,7 +46,7 @@ my %aml_type_hash = (0=>'CIDR',1=>'ACL',2=>'Key');
 our $inetFamily4 = undef;
 our $inetFamily6 = undef;
 our $inetNet = undef;
-
+our $formduid = undef;
 
 sub cgi_util_set_zone($$) {
   my ($id,$name) = @_;
@@ -178,10 +178,13 @@ sub form_check_field($$$) {
   } elsif ($type eq 'mac') { 
     return 'Ethernet address required!' if ($value !~ /^([0-9A-Fa-f]{12})$/ and $inetFamily4);
   } elsif ($type eq 'duid') {
-
+    $formduid = $value if $value !~ /^\s*$/;
     return 'Empty field not allowed! (Only if IPv6 address is entered)' if $value =~ /^\s*$/ and !$empty and ((!$inetFamily4 and !$inetFamily6) || $inetFamily6);
+    return 'Empty DUID required! (IPv6 address not set)' if $value !~ /^\s*$/ and $inetFamily4 and !$inetFamily6;
     return 'Valid DUID required!' if ($value !~ /^([0-9A-Fa-f]{1,40})$/ and $inetFamily6 and !$empty);
   } elsif ($type eq 'iaid') {
+    return 'Empty IAID required! (IPv6 address not set)' if $value !~ /^\s*$/ and !$inetFamily6;
+    return 'IAID can\'t be use without DUID' if $value !~ /^\s*$/ and $inetFamily6 and !$formduid;
     return 'Valid IAID required!' if !(($value > 0) and ($value < (2**32))) and $inetFamily6;
   } elsif ($type eq 'printer_class') {
     return 'Valid printer class name required!'
