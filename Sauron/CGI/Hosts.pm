@@ -188,6 +188,9 @@ my %restricted_host_form = (
    {ftype=>1, tag=>'duid', name=>'DUID', type=>'duid', len=>40,
    conv=>'U', iff=>['type','([19]|101)'], empty=>$main::SAURON_RHF{duid}},
 
+  {ftype=>1, tag=>'iaid', name=>'IAID', type=>'iaid', len=>11,
+   conv=>'U', iff=>['type','([19]|101)'], empty=>1, extrahex=>8},
+
   {ftype=>4, tag=>'ether_alias_info', name=>'Ethernet alias',
    iff=>['type','1']},
 
