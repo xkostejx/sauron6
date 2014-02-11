@@ -88,6 +88,7 @@ if ($opt_help || @ARGV < 2) {
 	"\t--setmx=<mxtemplate>\tdefault MX-template for hosts\n",
 
         "\t\t\t\tto the regular expression\n",
+    "\t--commit\t\tcommit changes (w/o this no changes are made)\n",
 	"\n";
   exit(($opt_help ? 0 : 1));
 }
@@ -272,8 +273,8 @@ while(<FILE>) {
   $duid = '';
   if ($opt_duid) {
     $duid = fix_duid($l[$opt_duid-1]);
-    unless ($duid =~ /^[0-9A-F]{24,40}$/) {
-      error("$filename($.): invalid duid: $duid") if ($opt_verbose && $duid);
+    unless ($duid =~ /^[0-9A-F]{1,40}$/) {
+      error("$filename($.): invalid duid: $duid");
       $duid = '';
       error("$filename($.): ignoring iaid: $iaid") if $iaid ne '';
       $iaid = '';
