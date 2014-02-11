@@ -600,6 +600,7 @@ sub menu_handler {
 	get_vlan_list($serverid,\%vlan_list_hash,\@vlan_list);
     }
     display_form(\%net,\%net_form);
+
     print p,"<TABLE><TR><TD> ",startform(-method=>'GET',-action=>$selfurl),
           hidden('menu','nets');
     print submit(-name=>'sub',-value=>'Edit'), "  ",
@@ -607,7 +608,7 @@ sub menu_handler {
 	    unless (check_perms('superuser','',1));
     print submit(-name=>'sub',-value=>'Net Info')," ";
     print submit(-name=>'sub',-value=>'Ping Sweep')
-            unless check_perms('level',$main::ALEVEL_NMAP,1);
+            if !check_perms('level',$main::ALEVEL_NMAP,1) and !is_ip6_prefix($net{net}); 
     print hidden('net_id',$id),end_form,"</TD><TD>";
     my $old_menu = param('menu');
     my $old_sub = param('sub');
