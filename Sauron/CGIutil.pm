@@ -45,6 +45,8 @@ my($CGI_UTIL_serverid,$CGI_UTIL_server);
 my %aml_type_hash = (0=>'CIDR',1=>'ACL',2=>'Key');
 our $inetFamily4 = undef;
 our $inetFamily6 = undef;
+our $inetNet = undef;
+
 
 sub cgi_util_set_zone($$) {
   my ($id,$name) = @_;
@@ -115,12 +117,13 @@ sub form_check_field($$$) {
     $type=$field->{type};
   }
 
-  unless ($empty == 1) {
-    return 'Empty field not allowed!' if ($value =~ /^\s*$/);
-  } else {
-    return '' if ($value =~ /^\s*$/);
+  if ($type ne 'duid') {
+      unless ($empty == 1) {
+        return 'Empty field not allowed!' if ($value =~ /^\s*$/);
+      } else {
+        return '' if ($value =~ /^\s*$/);
+      }
   }
-
 
   if ($type eq 'fqdn' || $type eq 'domain') {
     if ($type eq 'domain') {
@@ -139,10 +142,11 @@ sub form_check_field($$$) {
     return 'valid pathname required!'
       unless ($value =~ /^(|\S+\/)$/);
   } elsif ($type eq 'ip') {
-      my $inetFamily = ip_get_version($value);
-      $inetFamily4 = 1 if $inetFamily == 4;
-      $inetFamily6 = 1 if $inetFamily == 6;
-      return 'valid IP number required!' unless is_cidr($value);
+      if ($inetNet eq 'MANUAL' || !$inetNet ) {
+        $inetFamily4 = (ip_get_version($value) == 4 ? 1 : 0);
+        $inetFamily6 = (ip_get_version($value) == 6 ? 1 : 0);
+      }        
+    return 'valid IP number required!' unless is_cidr($value);
   } elsif ($type eq 'cidr') {
     return 'valid CIDR (IP) required!' unless (is_cidr($value));
   } elsif ($type eq 'text') {
@@ -174,9 +178,11 @@ sub form_check_field($$$) {
   } elsif ($type eq 'mac') { 
     return 'Ethernet address required!' if ($value !~ /^([0-9A-Fa-f]{12})$/ and $inetFamily4);
   } elsif ($type eq 'duid') {
+
+    return 'Empty field not allowed! (Only if IPv6 address is entered)' if $value =~ /^\s*$/ and !$empty and ((!$inetFamily4 and !$inetFamily6) || $inetFamily6);
     return 'Valid DUID required!' if ($value !~ /^([0-9A-Fa-f]{1,40})$/ and $inetFamily6);
   } elsif ($type eq 'iaid') {
-    return 'Valid IAID required!' if !(($value > 0) and ($value < (2**32))) and $inetFamily6;
+    return 'Valid IAID required!' if !(($value > 0) and ($value < (2**32))) and $inetFamily6 and !$empty;
   } elsif ($type eq 'printer_class') {
     return 'Valid printer class name required!'
       unless ($value =~ /^\@[a-zA-Z]+$/);
@@ -236,7 +242,9 @@ sub form_check_form($$$) {
   my($rec);
 
   $formdata=$form->{data};
+
   for $i (0..$#{$formdata}) {
+
     $rec=$$formdata[$i];
     $type=$rec->{ftype};
     $tag=$rec->{tag};
@@ -371,6 +379,14 @@ sub form_check_form($$$) {
       next if ($rec->{type} eq 'list');
       return 3 unless (${$rec->{enum}}{param($p)});
       $data->{$tag}=param($p);
+      if ($rec->{tag} eq 'net') {
+        $inetNet = param($p);
+        if ($inetNet ne 'MANUAL') {
+            $inetNet =~ s/\/(\d+){1,3}//g;
+            $inetFamily4 = (ip_get_version($inetNet) == 4 ? 1 : 0);
+            $inetFamily6 = (ip_get_version($inetNet) == 6 ? 1 : 0);
+        }
+      }
     }
     elsif ($type == 6 || $type == 7 || $type == 10) {
       return 6 unless (param($p) =~ /^-?\d+$/);

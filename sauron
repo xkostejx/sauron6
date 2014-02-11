@@ -457,6 +457,7 @@ if ($bind_conf) {
 	for $j (0..(@q-1)) {
 	  $ip=$q[$j][0];
 	  $ip =~ s/\/32$//g;
+	  $ip =~ s/\/128$//g;
 	  print BINDFILE " $ip; ";
 	}
 	print BINDFILE " };\n";

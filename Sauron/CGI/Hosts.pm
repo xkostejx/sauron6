@@ -312,7 +312,7 @@ my %restricted_new_host_form = (
   {ftype=>1, tag=>'cname_txt', name=>'Alias for', type=>'fqdn', len=>64,
    iff=>['type','4']},
   {ftype=>3, tag=>'net', name=>'Subnet', type=>'enum',
-   enum=>\%new_host_nets,elist=>\@new_host_netsl,iff=>['type','1']},
+   enum=>\%new_host_nets,elist=>\@new_host_netsl, iff=>['type','1']},
   {ftype=>1, tag=>'ip', 
    name=>'IP<FONT size=-1>(only if "Manual IP" selected from above)</FONT>', 
    type=>'ip', len=>30, empty=>1, iff=>['type','1']},
