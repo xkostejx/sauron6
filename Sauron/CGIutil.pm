@@ -180,9 +180,9 @@ sub form_check_field($$$) {
   } elsif ($type eq 'duid') {
 
     return 'Empty field not allowed! (Only if IPv6 address is entered)' if $value =~ /^\s*$/ and !$empty and ((!$inetFamily4 and !$inetFamily6) || $inetFamily6);
-    return 'Valid DUID required!' if ($value !~ /^([0-9A-Fa-f]{1,40})$/ and $inetFamily6);
+    return 'Valid DUID required!' if ($value !~ /^([0-9A-Fa-f]{1,40})$/ and $inetFamily6 and !$empty);
   } elsif ($type eq 'iaid') {
-    return 'Valid IAID required!' if !(($value > 0) and ($value < (2**32))) and $inetFamily6 and !$empty;
+    return 'Valid IAID required!' if !(($value > 0) and ($value < (2**32))) and $inetFamily6;
   } elsif ($type eq 'printer_class') {
     return 'Valid printer class name required!'
       unless ($value =~ /^\@[a-zA-Z]+$/);
