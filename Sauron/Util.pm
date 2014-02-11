@@ -410,9 +410,12 @@ sub normalize_ip6($) {
 sub is_ip6_prefix($) {
   my($ip6) = @_;
 
-  return 0 unless ($ip6 =~ /\/\d+$/);
-  return 0 unless (normalize_ip6($ip6));
-  return 1;
+  if(defined (new Net::IP($ip6))) {
+    $ip6 =~ s/\/\d+$//g;
+    return 1 if is_ip6($ip6);
+  }
+
+  return 0;
 }
 
 sub is_ip6($) {
