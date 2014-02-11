@@ -102,15 +102,17 @@ while(<FILE>) {
     s/[\s:]//g;
     next unless /([0-9A-Fa-f]{1,40})/;
     $duid=uc($1);
-    print "DUID=$duid ";
     db_query("SELECT h.id,h.domain FROM hosts h, zones z " .
          "WHERE z.server=$serverid AND h.zone=z.id " .
          " AND h.duid = '$duid'",\@q);
-    if ($q[0][0] > 0) {
-      print "$q[0][1] (id=$q[0][0])\n";
-      $delhash{$q[0][0]}++;
-    } else {
-      print "not found\n";
+    foreach $qq (@q) {
+        if ($$qq[0] > 0) {
+            print "DUID=$duid $$qq[1] (id=$$qq[0])\n";
+            $delhash{$$qq[0]}++;
+        } 
+        else {
+            print "not found\n";
+        }
     }
   }
 }
