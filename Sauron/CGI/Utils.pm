@@ -244,16 +244,7 @@ sub add_default_zones($$) {
     print "OK (id=$id)\n";
   }
 
-  %zone=(name=>'1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa',type=>'M', comment=>'Default zone', reverse=>'t',server=>$serverid,
-    ns=>[[0,'localhost.','']]);
-  print "Adding zone: $zone{name}...";
-  if (($id=add_zone(\%zone)) < 0) {
-    print "failed (zone already exists? $id)\n";
-  } else {
-    print "OK (id=$id)\n";
-  }
-
-  %zone=(name=>'0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa',type=>'M',comment=>'Default zone',reverse=>'t',server=>$serverid,
+  %zone=(name=>'0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa',type=>'M', comment=>'Default zone', reverse=>'t',server=>$serverid,
     ns=>[[0,'localhost.','']]);
   print "Adding zone: $zone{name}...";
   if (($id=add_zone(\%zone)) < 0) {

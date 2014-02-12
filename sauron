@@ -697,7 +697,7 @@ if ($bind_conf) {
 	       "ORDER BY a.ip,h.domain",\@q);
       error(db_errormsg()) if (db_errormsg());
       if (@q > 0) {
-	print ZONEFILE ";\n; reverse map for: $zone{reversenet}\n;\n"
+       print ZONEFILE ";\n; reverse map for: $zone{reversenet}\n;\n"
 	  if ($bind_conf);
 	for $i (0 .. $#q) {
 	  if (findNetblock($q[$i][0],\%delegnets)) {
