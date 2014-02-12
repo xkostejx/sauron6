@@ -359,6 +359,8 @@ my %restricted_new_host_form = (
    conv=>'U', iff=>['type','[19]'], empty=>$main::SAURON_RHF{ether}},
   {ftype=>1, tag=>'duid', name=>'DUID', type=>'duid', len=>40,
    conv=>'U', iff=>['type','([19]|101)'], empty=>$main::SAURON_RHF{duid}},
+  {ftype=>1, tag=>'iaid', name=>'IAID', type=>'iaid', len=>11,
+   conv=>'U', iff=>['type','([19]|101)'], empty=>1, extrahex=>8},
 
 
   {ftype=>1, tag=>'asset_id', name=>'Asset ID', type=>'text', len=>20,
