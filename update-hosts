@@ -235,12 +235,14 @@ while(<FILE>) {
   else { $domain = remove_origin($domain,$origin); }
 
   $ip='';
+  $ip6 = undef;
   if ($opt_ip) {
     $ip=trim($l[$opt_ip-1]);
-    unless (is_cidr($ip)) {
+    if (!is_cidr($ip)) {
       error("$filename($.): invalid ip: $ip");
       next;
     }
+    $ip6 = is_ip6($ip);
   }
 
   $ether='';
@@ -264,32 +266,44 @@ while(<FILE>) {
   $iaid = '';
   if ($opt_iaid) {
     $iaid0=$l[$opt_iaid-1];
-    unless ($iaid = is_iaid($iaid0)) {
-      error("$filename($.): invalid iaid: $iaid0");
-      $iaid = '';
+    if($ip6) {
+        unless ($iaid = is_iaid($iaid0)) {
+          error("$filename($.): invalid iaid: $iaid0");
+          $iaid = '';
+        }
     }
+    else {
+        error("$filename($.): ignoring iaid (IPv4 procesed): $iaid0");  
+    }
+    
   } 
 
   $duid = '';
   if ($opt_duid) {
     $duid = fix_duid($l[$opt_duid-1]);
-    unless ($duid =~ /^[0-9A-F]{1,40}$/) {
-      error("$filename($.): invalid duid: $duid");
-      $duid = '';
-      error("$filename($.): ignoring iaid: $iaid") if $iaid ne '';
-      $iaid = '';
-    } 
-    else {
-        if ($duidhash{$duid} && ($duidiaid{$duid} eq $iaid)) {
-            error("$filename($.): duplicate DUID + IAID: $duid + " . sprintf("%x",$iaid) . " (see line $duidhash{$duid})") if $iaid ne '';
-            error("$filename($.): duplicate DUID + IAID: $duid + empty IAID " . "(see line $duidhash{$duid})") if $iaid eq '';
-            $duid='';
-            $iaid='';
+    if($ip6) { 
+        unless ($duid =~ /^[0-9A-F]{1,40}$/) {
+          error("$filename($.): invalid duid: $duid");
+          $duid = '';
+          error("$filename($.): ignoring iaid: $iaid") if $iaid ne '';
+          $iaid = '';
         } 
         else {
-            $duidhash{$duid} = $.;
-            $duidiaid{$duid} = $iaid;
+            if ($duidhash{$duid} && ($duidiaid{$duid} eq $iaid)) {
+                error("$filename($.): duplicate DUID + IAID: $duid + " . sprintf("%x",$iaid) . " (see line $duidhash{$duid})") if $iaid ne '';
+                error("$filename($.): duplicate DUID + IAID: $duid + empty IAID " . "(see line $duidhash{$duid})") if $iaid eq '';
+                $duid='';
+                $iaid='';
+            } 
+            else {
+                $duidhash{$duid} = $.;
+                $duidiaid{$duid} = $iaid;
+            }
         }
+    }
+    else {
+        error("$filename($.): ignoring DUID (IPv4 procesed): $duid");
+        $duid = '';
     }
   }
 
