@@ -268,11 +268,11 @@ $timeout=$USER_TIMEOUT;
 get_who_list(\@who,$timeout);
 
 if (@who > 0) {
-  printf("%-8s %-22s %-15s %-6s %s\n",'USER','NAME','FROM','IDLE','LOGIN')
+  printf("%-8s %-22s %-39s %-6s %s\n",'USER','NAME','FROM','IDLE','LOGIN')
     unless ($opt_quiet);
 
   for $i(0..$#who) {
-    printf("%-8s %-22s %-15s %-6s %s\n",
+    printf("%-8s %-22s %-39s %-6s %s\n",
 	   $who[$i][0],$who[$i][1],$who[$i][2],$who[$i][3],$who[$i][4]);
   }
 } else {

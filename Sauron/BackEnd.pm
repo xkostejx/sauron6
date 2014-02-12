@@ -3208,6 +3208,7 @@ sub get_who_list($$) {
     $j= sprintf(" %02ds ",$s) if ($m <= 0 && $h <= 0);
     $ip = $q[$i][2];
     $ip =~ s/\/32$//;
+    $ip =~ s/\/128$//;
     $login_s=localtime($login);
     next unless ($idle < $timeout);
     push @{$lst},[$q[$i][0],$q[$i][1],$ip,$j,$login_s];
