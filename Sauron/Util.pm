@@ -271,7 +271,8 @@ sub arpa2cidr($) {
 
     $cidr .= "0" x (4 - ($mask % 4)) if $mask % 4 != 0;
 
-    $cidr .= "::" if ($mask < 32 and $mask % 4 != 0);
+    #<28 because last hextet is already filled
+    $cidr .= "::" if ($mask < 28 and $mask % 4 != 0);
     $cidr .= ":" if ($mask < 32 and $mask % 4 == 0);
     chop($cidr) if $mask == 32;
 
