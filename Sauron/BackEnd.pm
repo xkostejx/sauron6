@@ -439,7 +439,8 @@ sub update_array_field($$$$$$) {
   return -1 unless (ref($rec) eq 'HASH');
   return -2 unless ($$rec{'id'} > 0);
   $list=$$rec{$keyname};
-  return 0 unless ($list);
+  return 0 unless (\$list);
+  
   @f=split(",",$fields);
 
   for $i (1..$#{$list}) {
@@ -472,7 +473,7 @@ sub update_array_field($$$$$$) {
       }
       $str.=",$vals)";
       #print "<BR>DEBUG: add record $id $str";
-      return -7 if (db_exec($str) < 0);
+     return -7 if (db_exec($str) < 0);
     }
   }
 
