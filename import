@@ -26,6 +26,56 @@ load_config();
 ##############################
 
 GetOptions("help|h","orphans=s","notransaction","verbose|v","dir=s");
+%GLOBAL_ACL = ('any' => 1, 'none' => 2, 'localhost' => 3, 'localnets' => 4);
+
+sub get_array_entries($$$$) {
+    my ($section, $ref, $acls, $allowacl) = @_;
+    my @ret;    
+    my $notop = 0;
+        
+    foreach my $entry (@{$ref}) {
+        $notop = ($entry =~ /^\!/ ? 1 : 0);
+        $entry =~ s/^\!//;
+        if (is_cidr($entry)) {
+            push @ret, [ undef, '0', $entry, '-1', '-1', $notop, '', 2 ];
+            print "$section=$entry\n" if ($opt_verbose);
+        }
+        elsif ($allowacl) {
+            if($acls->{$entry}) {
+                push @ret, [ undef, '1', '', $acls->{$entry}, '-1', $notop, '', 2 ];
+                print "$section=$entry\n" if ($opt_verbose);
+            }
+            else {
+                print "Ignoring '$section' value '$entry' (must be valid IP or ACL value)\n" if ($opt_verbose);
+            }
+        }
+        else {
+            print "Ignoring '$section' value '$entry' (must be valid IP value)\n" if ($opt_verbose);
+        }
+    }
+
+    print Dumper(\@ret);
+    return @ret;
+}
+
+sub create_acl($$$$$) {
+    my ($serverid, $user, $name, $acls, $entries) = @_;
+    my %data;
+    $data{name} = $name;
+    $data{cuser} = $user;
+    $data{server} = $serverid;
+    $data{acl} = [];
+    push @{$data{acl}}, ['aml', $serverid];
+
+    @acl_data = get_array_entries("acl/$name", $entries, $acls, 1);
+    push @{$data{acl}}, @acl_data;
+
+    print "IN add_acl '$name'\n";
+    print Dumper(\%data);
+    
+    my $res = add_acl(\%data);
+    return $res;
+}
 
 sub get_value($$$) {
     my ($line, $name, $val) = @_;
@@ -34,9 +84,6 @@ sub get_value($$$) {
         $$val = $1;
         print "$name=$$val\n" if ($opt_verbose);
         return 1;
-    }
-    else {
-        $$val = undef;
     }
 
     return 0;
@@ -55,7 +102,6 @@ sub get_enum_value($$$$) {
         return 1;
     }
 
-    $$val = undef;
     return 0;
 }
 
@@ -73,7 +119,6 @@ sub get_ip_value($$$$) {
         return 1;
     }
 
-    $$val = undef;
     return 0;
 }
 
@@ -181,6 +226,7 @@ my @allow_notify;
 my @blackhole;
 my @forwarders;
 
+my $directory;
 my $options_global;
 my $options_custom;
 my $options_logging;
@@ -267,31 +313,20 @@ foreach $line (@NAMEDCONF) {
   }
 
   $line = $_;
-  $line =~ s/(^\s+|;\s*$)//g;			
+  $line =~ s/(^\s+|;\s*$)//g;
+  print "LINE: $line\n";			
 
  	
   if ($cur =~ "options")  {
     
 
     next if get_value($_, 'directory', \$directory);
-
-    #if ( /directory\s+\"(.*?)\"\s*;/ ) {
-    #  $directory=$1; 
-    #  print "directory=$directory\n" if ($opt_verbose);
-    #  next;
-    #}
-
-    #if (/recursion\s+(.*?)\s*;/) {
-    #    $recursion = $1;
-    #    if($recursion =~ /yes|no/) {
-    #        print "recursion=$recursion\n" if ($opt_verbose);
-    #    }
-    #    else {
-    #        print "Ignoring 'recursion' value '$recursion' (must be 'yes', 'no')\n" if ($opt_verbose);
-    #        $recursion = undef;
-    #    }    
-    #    next; 
-    #}
+    next if get_value($_, 'version', \$version);
+    next if get_value($_, "pid-file" , \$pid_file);
+    next if get_value($_, "dump-file", \$dump_file);
+    next if get_value($_, "statistics-file", \$statistics_file);
+    next if get_value($_, "memstatistics-file", \$memstatistics_file);
+    next if get_value($_, "named-xfer", \$named_xfer);
 
     next if get_enum_value($_, 'recursion'      ,\$recursion      ,'yes|no');
     next if get_enum_value($_, 'notify'         ,\$notify         ,'yes|no');
@@ -302,127 +337,12 @@ foreach $line (@NAMEDCONF) {
     next if get_enum_value($_, 'check-names master'  ,\$check_names_master  ,'ignore|warn|fail');
     next if get_enum_value($_, 'check-names slave'   ,\$check_names_slave   ,'ignore|warn|fail');
     next if get_enum_value($_, 'check-names response',\$check_names_response,'ignore|warn|fail');
-
-    
-    #if (/notify\s+(.*?)\s*;/) {
-    #    $notify = $1;
-    #    if($notify =~ /yes|no/) {
-    #        print "notify=$notify\n" if ($opt_verbose);
-    #    }
-    #    else {
-    #        print "Ignoring 'notify' value '$notify' (must be 'yes', 'no')\n" if ($opt_verbose);
-    #        $notify = undef;
-    #    }    
-    #    next; 
-    #}
-
-    #if (/auth-nxdomain\s+(.*?)\s*;/) {
-    #    $auth_nxdomain = $1;
-    #    if($auth_nxdomain =~ /yes|no/) {
-    #        print "auth-nxdomain=$auth_nxdomain\n" if ($opt_verbose);
-    #    }
-    #    else {
-    #        print "Ignoring 'auth-nxdomain' value '$auth_nxdomain' (must be 'yes', 'no')\n" if ($opt_verbose);
-    #        $auth_nxdomain = undef;
-    #    }
-    #    next;
-    #}
-
-    #if (/dialup\s+(.*?)\s*;/) {
-    #    $dialup = $1;
-    #    if($dialup =~ /yes|no/) {
-    #        print "dialup=$dialup\n" if ($opt_verbose);
-    #    }
-    #    else {
-    #        print "Ignoring 'dialup' value '$dialup' (must be 'yes', 'no')\n" if ($opt_verbose);
-    #        $dialup = undef;
-    #    }    
-    #    next; 
-    #}
-
-    #if (/multiple-cnames\s+(.*?)\s*;/) {
-    #    $multiple_cnames = $1;
-    #    if($multiple_cnames =~ /yes|no/) {
-    #        print "multiple-cnames=$multiple_cnames\n" if ($opt_verbose);
-    #    }
-    #    else {
-    #        print "Ignoring 'multiple-cnames' value '$multiple_cnames' (must be 'yes', 'no')\n" if ($opt_verbose);
-    #        $multiple_cnames = undef;
-    #    }    
-    #    next; 
-    #}
-
-
-    #if (/rfc2308-type1\s+(.*?)\s*;/) {
-    #    $rfc2308_type1 = $1;
-    #    if($rfc2308_type1 =~ /yes|no/) {
-    #        print "rfc2308-type1=$rfc2308_type1\n" if ($opt_verbose);
-    #    }
-    #    else {
-    #        print "Ignoring 'rfc2308-type1' value '$rfc2308_type1' (must be 'yes', 'no')\n" if ($opt_verbose);
-    #        $rfc2308_type1 = undef;
-    #    }    
-    #    next; 
-    #}
-
-    #if (/check-names master\s+(.*?)\s*;/) {
-    #    $check_names_master = $1;
-    #    if($check_names_master =~ /ignore|warn|fail/) {
-    #        print "check-names master=$check_names_master\n" if ($opt_verbose);
-    #    }
-    #    else {
-    #        print "Ignoring 'check-names master' value '$check_names_master' (must be 'ignore', 'warn' or 'fail')\n" if ($opt_verbose);
-    #        $check_names_master = undef;
-    #    }    
-    #    next; 
-    #}
-
-    #if (/check-names slave\s+(.*?)\s*;/) {
-    #    $check_names_slave = $1;
-    #    if($check_names_slave =~ /ignore|warn|fail/) {
-    #        print "check-names slave=$check_names_slave\n" if ($opt_verbose);
-    #    }
-    #    else {
-    #        print "Ignoring 'check-names slave' value '$check_names_slave' (must be 'ignore', 'warn' or 'fail')\n" if ($opt_verbose);
-    #        $check_names_slave = undef;
-    #    }    
-    #    next; 
-    #}
-
-    #if (/check-names response\s+(.*?)\s*;/) {
-    #    $check_names_response = $1;
-    #    if($check_names_response =~ /ignore|warn|fail/) {
-    #        print "check-names response=$check_names_response\n" if ($opt_verbose);
-    #    }
-    #    else {
-    #        print "Ignoring 'check-names response' value '$check_names_response' (must be 'ignore', 'warn' or 'fail')\n" if ($opt_verbose);
-    #        $check_names_response = undef;
-    #    }    
-    #    next; 
-    #}
-
-    next if get_value($_, 'version', \$version);
-
-    #if (/version\s+\"(.*?)\"\s*;/ ) {
-    #    $version=$1;
-    #    print "version=$version\n" if ($opt_verbose);
-    #    next;
-    #}
-
     next if get_enum_value($_, 'forward', \$forward, 'first|only');   
 
-    #if (/forward\s+(.*?)\s*;/) {
-    #    $forward = $1;
-    #    if($forward =~ /first|only/) {
-    #        print "forward=$forward\n" if ($opt_verbose);
-    #    }
-    #    else {
-    #        print "Ignoring 'forward' value '$forward' (must be 'first', 'only')\n" if ($opt_verbose);
-    #        $forward = undef;
-    #    }    
-    #    next; 
-    #}
+    next if get_ip_value($_, 'transfer-source', \$transfer_source, 4);
+    next if get_ip_value($_, 'transfer-source-v6', \$transfer_source_v6, 6);
 
+    
     if (/query-source address\s+(.*?)\s+port\s+(.*?)\s*;/) {
         $query_source_address = $1;
         $query_source_port = $2;
@@ -468,68 +388,7 @@ foreach $line (@NAMEDCONF) {
     }
 
 
-    next if get_ip_value($_, 'transfer-source', \$transfer_source, 4);
-
-    #if (/transfer-source\s+(.*?)\s*;/) {
-    #    $transfer_source = $1;
-    #    $validip = is_ip($transfer_source);
-    #    if($validip) {
-    #        print "transfer-source=$transfer_source\n" if ($opt_verbose);
-    #    }
-    #    else {
-    #        print "Ignoring 'transfer-source' value '$transfer_source' (must be valid IPv4 address)\n" if ($opt_verbose and !$validip);
-    #        $transfer_source = undef;
-    #    }
-    #    next;
-    #}
-
-    next if get_ip_value($_, 'transfer-source-v6', \$transfer_source_v6, 6);
-
-    #if (/transfer-source-v6\s+(.*?)\s*;/) {
-    #    $transfer_source_v6 = $1;
-    #    $validip = is_ip6($transfer_source_v6);
-    #    if($validip) {
-    #        print "transfer-source-v6=$transfer_source_v6\n" if ($opt_verbose);
-    #    }
-    #    else {
-    #        print "Ignoring 'transfer-source-v6' value '$transfer_source_v6' (must be valid IPv6 address)\n" if ($opt_verbose and !$validip);
-    #        $transfer_source_v6 = undef;
-    #    }
-    #    next;
-    #}
-
-
-    next if get_value($_, "pid-file" , \$pid_file);
-    next if get_value($_, "dump-file", \$dump_file);
-    next if get_value($_, "statistics-file", \$statistics_file);
-    next if get_value($_, "memstatistics-file", \$memstatistics_file);
-    next if get_value($_, "named-xfer", \$named_xfer);
-
-    #if (/dump-file\s+\"(.*?)\"\s*;/ ) {
-    #    $dump_file=$1;
-    #    print "dump-file=$dump_file\n" if ($opt_verbose);
-    #    next;
-    #}
-
-    #if (/statistics-file\s+\"(.*?)\"\s*;/ ) {
-    #    $statistics_file=$1;
-    #    print "statistics-file=$statistics_file\n" if ($opt_verbose);
-    #    next;
-    #}
-
-    #if (/memstatistics-file\s+\"(.*?)\"\s*;/ ) {
-    #    $memstatistics_file=$1;
-    #    print "memstatistics-file=$memstatistics_file\n" if ($opt_verbose);
-    #    next;
-    #}
-
-    #if (/named-xfer\s+\"(.*?)\"\s*;/ ) {
-    #    $named_xfer=$1;
-    #    print "named-xfer=$named_xfer\n" if ($opt_verbose);
-    #    next;
-    #}
-    
-    $options_custom .= $line;
+        $options_custom .= $line;
     print "options-custom: :$line\n" if ($opt_verbose);
     next;
 
@@ -611,10 +470,20 @@ foreach $line (@NAMEDCONF) {
 	   $notify{$curzone} = ("\L$1" eq 'no' ? 'no' : 'yes');
 	   next;
        }
+       if ( /transfer-source\s+(.*?)\s*;/ ) {
+	   #print "transfer-source=$1\n";
+	   $transfersource{$curzone} = $1;
+	   next;
+       }
+       if ( /transfer-source-v6\s+(.*?)\s*;/ ) {
+	   #print "transfer-source-v6=$1\n";
+	   $transfersourcev6{$curzone} = $1;
+	   next;
+       }
    }
 
    if ($cur =~ /^acl (.*)$/) {
-       push @{$acls{$1}}, $_;
+       push @{$acls{$1}}, $line;
        next;
    }
 
@@ -622,44 +491,64 @@ foreach $line (@NAMEDCONF) {
        $curzone=$1;
        if ($cur =~ "masters" && is_cidr($line) ) {
            $ip=$line;
-	   #print "master ($curzone) ip=$ip\n";
-	   $ref = $masters{$curzone};
-	   unless ($ref) {
-	     $masters{$curzone}=[];
-	     $ref = $masters{$curzone};
-	   }
-	   push @{$ref}, [0,$ip,''];
-	   next;
+           #print "master ($curzone) ip=$ip\n";
+           $ref = $masters{$curzone};
+           unless ($ref) {
+             $masters{$curzone}=[];
+             $ref = $masters{$curzone};
+           }
+           push @{$ref}, [0,$ip,''];
+           next;
        }
-       if ($cur =~ "allow-update" && is_cidr($line) ) {
-	   $ip=$line;
-	   #print "allow-update ($curzone) ip=$ip\n";
-	   $ref = $allowupdate{$curzone};
-	   unless ($ref) {
-	     $allowupdate{$curzone}=[];
-	     $ref = $allowupdate{$curzone};
-	   }
-	   push @{$ref}, [0,$ip,''];
-	   next;
+       
+       if ($cur =~ "allow-update") {
+           print "allow-update ($curzone) line=$line\n";
+           $ref = $allowupdate{$curzone};
+           unless ($ref) {
+             $allowupdate{$curzone}=[];
+             $ref = $allowupdate{$curzone};
+           }
+           push @{$ref}, $line;
+           next;
        }
-       if ($cur =~ "also-notify" && is_cidr($line) ) {
-	   $ip=$line;
-	   #print "also-notify ($curzone) ip=$ip\n";
-	   $ref = $alsonotify{$curzone};
-	   unless ($ref) {
-	     $alsonotify{$curzone}=[];
-	     $ref = $alsonotify{$curzone};
-	   }
-	   push @{$ref}, [0,$ip,''];
-	   next;
+
+      if ($cur =~ "allow-transfer") {
+           print "allow-transfer ($curzone) line=$line\n";
+           $ref = $allowtransfer{$curzone};
+           unless ($ref) {
+             $allowtransfer{$curzone}=[];
+             $ref = $allowtransfer{$curzone};
+           }
+           push @{$ref}, $line;
+           next;
+       }
+    
+       if ($cur =~ "also-notify") {
+           print "also-notify ($curzone) line=$line\n";
+           $ref = $alsonotify{$curzone};
+           unless ($ref) {
+             $alsonotify{$curzone}=[];
+             $ref = $alsonotify{$curzone};
+           }
+           push @{$ref}, $line;
+           next;
+       }
+
+       if ($cur =~ "allow-query") {
+           print "allow-query ($curzone) line=$line\n";
+           $ref = $allowquery{$curzone};
+           unless ($ref) {
+             $allowquery{$curzone}=[];
+             $ref = $allowquery{$curzone};
+           }
+           push @{$ref}, $line;
+           next;
        }
    }
 
 
    print "UNPROCESSED line ($cur): $_\n";
 }
-
-#hack 
 
 print "OPTIONS_CUSTOM: $options_custom\n";
 print "OPTIONS_GLOBAL: $options_global\n";
@@ -698,6 +587,16 @@ fatal("Cannot create server record '$servername' ($serverid)")
 			       if ($serverid < 0);
 print "server id=$serverid\n" if ($opt_verbose);
 
+
+#########################################
+# create acls
+
+print Dumper(keys %acls);
+
+foreach my $acl (reverse keys %acls) {
+    my $aclid = create_acl($serverid, $user, $acl, \%GLOBAL_ACL, $acls{$acl});
+    $GLOBAL_ACL{$acl} = $aclid if $aclid > 0;
+}
 
 #########################################
 # create zones
@@ -757,10 +656,27 @@ for ($i=0; $i <= $#zones; $i+=1) {
   $tmphash{name}=$zone;
   $tmphash{chknames}=$check_names;
   $tmphash{nnotify}=$nnotify;
-  $tmphash{also_notify}=$alsonotify{$zones[$i]} if ($alsonotify{$zones[$i]});
   $tmphash{masters}=$masters{$zones[$i]}  if ($masters{$zones[$i]});
-  $tmphash{allow_update}=$allowupdate{$zones[$i]}
-    if ($allowupdate{$zones[$i]});
+  
+   if($alsonotify{$zones[$i]}) {
+    push @{$tmphash{also_notify}}, get_array_entries($zone, $alsonotify{$zones[$i]}, \%GLOBAL_ACL, 0);
+  }
+  
+  if($allowupdate{$zones[$i]}) {
+    push @{$tmphash{allow_update}}, get_array_entries($zone, $allowupdate{$zones[$i]}, \%GLOBAL_ACL, 1);
+  }
+  
+  if($allowquery$zones[$i]}) {
+    push @{$tmphash{allow_query}}, get_array_entries($zone, $allowquery{$zones[$i]}, \%GLOBAL_ACL, 1);
+  }
+  
+  if($allowtransfer{$zones[$i]}) {
+    push @{$tmphash{allow_transfer}}, get_array_entries($zone, $allowtransfer{$zones[$i]}, \%GLOBAL_ACL, 1);
+  }
+
+
+  #$tmphash{allow_update}=$allowupdate{$zones[$i]}  if ($allowupdate{$zones[$i]});
+  #$tmphash{also_notify}=$alsonotify{$zones[$i]} if ($alsonotify{$zones[$i]});
 
   if (($zoneid = add_zone(\%tmphash)) < 0) {
     print "zone allready exists! skipping\n";

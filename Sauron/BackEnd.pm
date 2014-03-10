@@ -3096,7 +3096,7 @@ sub add_acl($) {
 
   db_begin();
   $rec->{cdate}=time;
-  $rec->{cuser}=$muser;
+  $rec->{cuser} = $muser if !$rec->{'cuser'};
   $res = add_record('acls',$rec);
   if ($res < 0) { db_rollback(); return -1; }
   $rec->{id}=$id=$res;
