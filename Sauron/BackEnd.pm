@@ -440,10 +440,10 @@ sub update_array_field($$$$$$) {
   return -2 unless ($$rec{'id'} > 0);
   $list=$$rec{$keyname};
   return 0 unless (\$list);
-  
+ 
   @f=split(",",$fields);
 
-  for $i (1..$#{$list}) {
+   for $i (1..$#{$list}) {
     $m=$$list[$i][$count];
     $id=$$list[$i][0];
     if ($m == -1) { # delete record
@@ -473,7 +473,7 @@ sub update_array_field($$$$$$) {
       }
       $str.=",$vals)";
       #print "<BR>DEBUG: add record $id $str";
-     return -7 if (db_exec($str) < 0);
+      return -7 if (db_exec($str) < 0);
     }
   }
 
@@ -724,7 +724,8 @@ sub get_server($$) {
 		    "df_loadbalmax,hostaddr,".
 		    "cdate,cuser,mdate,muser,lastrun," .
 		    "df_port6,df_max_delay6,df_max_uupdates6,df_mclt6,df_split6,".
-		    "df_loadbalmax6,dhcp_flags6",
+		    "df_loadbalmax6,dhcp_flags,". 
+            "listen_on_port_v6,transfer_source_v6,query_src_ip_v6,query_src_port_v6",
 		    $id,$rec,"id");
   return -1 if ($res < 0);
   fix_bools($rec,"no_roots,zones_only");
@@ -733,9 +734,11 @@ sub get_server($$) {
   get_aml_field($id,7,$id,$rec,'allow_query');
   get_aml_field($id,8,$id,$rec,'allow_recursion');
   get_aml_field($id,9,$id,$rec,'blackhole');
+  get_aml_field($id,10,$id,$rec,'listen_on');
+  get_aml_field($id,16,$id,$rec,'listen_on_v6');
 
-  get_array_field("cidr_entries",3,"id,ip,comment","IP,Comments",
-		  "type=10 AND ref=$id ORDER BY ip",$rec,'listen_on');
+  #get_array_field("cidr_entries",3,"id,ip,comment","IP,Comments",
+  #		  "type=10 AND ref=$id ORDER BY ip",$rec,'listen_on');
   get_array_field("cidr_entries",3,"id,ip,comment","IP,Comments",
 		  "type=11 AND ref=$id ORDER BY ip",$rec,'forwarders');
   get_array_field("dhcp_entries",3,"id,dhcp,comment","DHCP,Comments",
@@ -771,6 +774,7 @@ sub get_server($$) {
     $rec->{server_type}='Master';
   }
 
+ 
   add_std_fields($rec);
   return 0;
 }
@@ -780,6 +784,8 @@ sub get_server($$) {
 sub update_server($) {
   my($rec) = @_;
   my($r,$id);
+
+  print Dumper($rec);
 
   del_std_fields($rec);
   delete $rec->{dhcp_flags};
@@ -838,9 +844,12 @@ sub update_server($) {
   $r=update_aml_field(9,$id,$rec,'blackhole');
   if ($r < 0) { db_rollback(); return -17; }
   # listen_on
-  $r=update_array_field("cidr_entries",3,"ip,comment,type,ref",
-			'listen_on',$rec,"10,$id");
+  $r=update_aml_field(10,$id,$rec,'listen_on');
   if ($r < 0) { db_rollback(); return -18; }
+  #
+  #$r=update_array_field("cidr_entries",3,"ip,comment,type,ref",
+  #  		'listen_on',$rec,"10,$id");
+  #if ($r < 0) { db_rollback(); return -18; }
   # forwarder
   $r=update_array_field("cidr_entries",3,"ip,comment,type,ref",
 			 'forwarders',$rec,"11,$id");
@@ -864,6 +873,11 @@ sub update_server($) {
   # allow_notify
   $r=update_aml_field(15,$id,$rec,'allow_notify');
   if ($r < 0) { db_rollback(); return -23; }
+
+  # listen_on
+  $r=update_aml_field(16,$id,$rec,'listen_on_v6');
+  if ($r < 0) { db_rollback(); return -24; }
+
 
   return db_commit();
 }
