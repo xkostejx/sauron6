@@ -216,7 +216,7 @@ sub is_cidr_within_cidr($$) {
 sub arpa2cidr($) {
   my($arpa) = @_;
   my($i,$s,$cidr,@m);
-  my($r_begin,$r_end,$range);
+  my($r_begin,$r_end,$range,$mask);
 
   # support for smaller than class-C delegations
   if ($arpa =~ /^(\d+)\-(\d+)(\..*)$/) {
@@ -228,6 +228,14 @@ sub arpa2cidr($) {
 	  unless ($range==2 || $range==4 || $range==8 || $range==16 ||
 		  $range==32 || $range==64 || $range==128);
       $range=int(log($range)/log(2));
+  }
+
+  if ($arpa =~ /^(\d+)\/(\d+)(\..*)$/) {
+      $mask = $1;
+      return '0.0.0.0/0' if ($mask > 32);
+
+      $range= (32 - $mask);
+      $arpa=$2 . $3;
   }
 
   if($arpa =~ /^(\d{1,3}\.)?(\d{1,3}\.)?(\d{1,3}\.)?(\d{1,3}\.)in-addr\.arpa/){
@@ -249,8 +257,11 @@ sub arpa2cidr($) {
       } else { 
         $s=(32-($s*8)); 
       }
+   
+      my $ret_cidr = $cidr . "/" . $s;
 
-      return $cidr . "/" . $s;
+      return '0.0.0.0/0' if !is_cidr($ret_cidr);
+      return $ret_cidr;
   }
   elsif($arpa =~ /^(([a-fA-F0-9]\.){1,32})ip6\.(arpa|int)/){
     my @nums  = split /\./, $1;
