@@ -30,14 +30,17 @@ GetOptions("help|h","orphans=s","notransaction","verbose|v","dir=s");
 
 sub get_array_entries($$$$) {
     my ($section, $ref, $acls, $allowacl) = @_;
-    my @ret;    
+    #Because update_array_field function iterates from 1 (not 0) :-/
+    my @ret = [0];    
     my $notop = 0;
         
     foreach my $entry (@{$ref}) {
         $notop = ($entry =~ /^\!/ ? 1 : 0);
         $entry =~ s/^\!//;
         if (is_cidr($entry)) {
-            push @ret, [ undef, '0', $entry, '-1', '-1', $notop, '', 2 ];
+            push @ret, [ undef, '0', $entry, '-1', '-1', $notop, '', 2 ] if $allowacl;
+            #Simple IP section = (w/o ACL)
+            push @ret, [ '0', $entry, '' ] if not $allowacl;
             print "$section=$entry\n" if ($opt_verbose);
         }
         elsif ($allowacl) {
@@ -54,9 +57,21 @@ sub get_array_entries($$$$) {
         }
     }
 
-    print Dumper(\@ret);
     return @ret;
 }
+
+sub get_array_txt_entries($$$) {
+    my ($section, $src, $separator) = @_;
+    my @ret = [0];    
+    
+    foreach my $entry (split("$separator", $src)) {
+        push @ret, [ undef, $entry . $separator, '', 2 ];
+        print "$section=$entry\n" if ($opt_verbose);
+    }
+    
+    return @ret;
+}
+
 
 sub create_acl($$$$$) {
     my ($serverid, $user, $name, $acls, $entries) = @_;
@@ -71,7 +86,7 @@ sub create_acl($$$$$) {
     push @{$data{acl}}, @acl_data;
 
     print "IN add_acl '$name'\n";
-    print Dumper(\%data);
+    #print Dumper(\%data);
     
     my $res = add_acl(\%data);
     return $res;
@@ -79,7 +94,7 @@ sub create_acl($$$$$) {
 
 sub get_value($$$) {
     my ($line, $name, $val) = @_;
-    my $re = qr/$name\s+\"(.*?)\"\s*;/;
+    my $re = qr/^$name\s+\"(.*?)\"\s*;/;
     if($line =~ /$re/) {
         $$val = $1;
         print "$name=$$val\n" if ($opt_verbose);
@@ -91,13 +106,15 @@ sub get_value($$$) {
 
 sub get_enum_value($$$$) {
     my ($line, $name, $val, $rules) = @_;
-    if($line =~ qr/$name\s+(.*?)\s*;/) {
+    if($line =~ qr/^$name\s+(.*?)\s*;/) {
         $$val = $1; 
         if($$val =~ qr/$rules/) {
+            $valinfo = $$val;
+            $$val = substr(uc($$val), 0, 1);
             print "$name=$$val\n" if ($opt_verbose);
         }
         else {
-            print "Ignoring '$name' value '$$val' (must be '$rules')\n" if ($opt_verbose);
+            print "Ignoring '$name' value '$valinfo' (must be '$rules')\n" if ($opt_verbose);
         }
         return 1;
     }
@@ -213,7 +230,6 @@ while (<NAMEDCONF>) {
 push @NAMEDCONF, $partial if ($partial);
 close(NAMEDCONF);
 
-push @allow_transfer, [];
 
 my %acls;
 my @listen_on;
@@ -319,7 +335,6 @@ foreach $line (@NAMEDCONF) {
  	
   if ($cur =~ "options")  {
     
-
     next if get_value($_, 'directory', \$directory);
     next if get_value($_, 'version', \$version);
     next if get_value($_, "pid-file" , \$pid_file);
@@ -388,19 +403,13 @@ foreach $line (@NAMEDCONF) {
     }
 
 
-        $options_custom .= $line;
+        $options_custom .= $_;
     print "options-custom: :$line\n" if ($opt_verbose);
     next;
 
    }
    if ($prev =~ "options") {
-        #if ($cur =~ "allow-transfer" && is_cidr($line) ) {
-	    #    $ip=$line;
-	    #    #print "allow transfer ip=$ip\n" if ($opt_verbose);
-	    #    push @allow_transfer, [0,$ip,''];
-	    #    next;
-        #}
-
+        
         if ($cur =~ "listen-on port") {
             push @listen_on, $line;    
             next;
@@ -411,18 +420,18 @@ foreach $line (@NAMEDCONF) {
             next;
         }
 
-        if ($cur =~ "allow-query") {
+        if ($cur =~ /^allow-query$/) {
             push @allow_query, $line;
             next;
         }
 
-        if ($cur =~ "allow-query-cache") {
+        if ($cur =~ /^allow-query-cache$/) {
             push @allow_query_cache, $line;
             next;
         }
 
         if ($cur =~ "allow-transfer") {
-            push @allow_query, $line;
+            push @allow_transfer, $line;
             next;
         }
 
@@ -550,9 +559,7 @@ foreach $line (@NAMEDCONF) {
    print "UNPROCESSED line ($cur): $_\n";
 }
 
-print "OPTIONS_CUSTOM: $options_custom\n";
-print "OPTIONS_GLOBAL: $options_global\n";
-print "OPTIONS LOGGING: $options_logging\n";
+
 $c = @zones;
 
 print "Found $c zones from named.conf ($namedf)\n";
@@ -573,6 +580,8 @@ unless ($opt_notransaction) {
 ##################################
 # create server record
 
+push @tmp_forwarders,       get_array_entries($zone, \@forwarders,      \%GLOBAL_ACL, 0);
+
 $named_ca = 'named.ca' unless ($named_ca);
 $serverid = add_server({
 			name=>$servername,
@@ -580,8 +589,31 @@ $serverid = add_server({
 			named_ca=>$named_ca,
 			directory=>$directory,
 			version=>$version,
-			allow_transfer=>\@allow_transfer
-		       });
+            pid_file => $pid_file,
+            dump_file => $dump_file,
+            stats_file => $statistics_file,
+            memstats_file => $memstatistics_file,
+            named_xfer => $named_xfer,
+            recursion => $recursion,
+            nnotify => $notify,
+            authnxdomain => $auth_nxdomain,
+            dialup => $dialup,
+            multiple_cnames => $multiple_cnames,
+            rfc2308_type1 => $rfc2308_type1,
+            checknames_m => $check_names_master,
+            checknames_s => $check_names_slave,
+            checknames_r => $check_names_response,
+            forward => $forward,
+            transfer_source => $transfer_source,
+            transfer_source_v6 => $transfer_source_v6,
+            query_src_ip => $query_source_address,
+            query_src_port => $query_source_port,
+            query_src_ip_v6 => $query_source_address6,
+            query_src_port_v6 => $query_source_port6,
+            forwarders =>\@tmp_forwarders,
+		    });
+            #   transfer-source
+#   transfer-source-v6
 
 fatal("Cannot create server record '$servername' ($serverid)")
 			       if ($serverid < 0);
@@ -591,12 +623,53 @@ print "server id=$serverid\n" if ($opt_verbose);
 #########################################
 # create acls
 
-print Dumper(keys %acls);
-
 foreach my $acl (reverse keys %acls) {
     my $aclid = create_acl($serverid, $user, $acl, \%GLOBAL_ACL, $acls{$acl});
     $GLOBAL_ACL{$acl} = $aclid if $aclid > 0;
 }
+
+#########################################
+# update server
+
+push @tmp_allow_query,      get_array_entries($zone, \@allow_query,     \%GLOBAL_ACL, 1);
+push @tmp_allow_query_cache,get_array_entries($zone, \@allow_query_cache,\%GLOBAL_ACL, 1);
+push @tmp_allow_transfer,   get_array_entries($zone, \@allow_transfer,  \%GLOBAL_ACL, 1);
+push @tmp_allow_recursion,  get_array_entries($zone, \@allow_recursion, \%GLOBAL_ACL, 1);
+push @tmp_allow_notify,     get_array_entries($zone, \@allow_notify,    \%GLOBAL_ACL, 1);
+push @tmp_blackhole,        get_array_entries($zone, \@blackhole,       \%GLOBAL_ACL, 1);
+push @tmp_listen_on,        get_array_entries($zone, \@listen_on,       \%GLOBAL_ACL, 1);
+push @tmp_listen_on_v6,     get_array_entries($zone, \@listen_on_v6,    \%GLOBAL_ACL, 1);
+
+my @options_custom = get_array_txt_entries("custom-options", $options_custom, ";");
+my @options_global = get_array_txt_entries("global-options", $options_global, ";");
+my @options_logging = get_array_txt_entries("logging-options", $options_logging, "};");
+
+#print "OPTIONS_CUSTOM: $options_custom\n";
+#print "OPTIONS_GLOBAL: $options_global\n";
+#print "OPTIONS LOGGING: $options_logging\n";
+
+$update_ret = update_server({
+            id => $serverid,
+            allow_query =>\@tmp_allow_query,
+            allow_query_cache =>\@tmp_allow_query_cache,
+            allow_transfer =>\@tmp_allow_transfer,
+            allow_recursion =>\@tmp_allow_recursion,
+            allow_notify =>\@tmp_allow_notify,
+            blackhole =>\@tmp_blackhole,
+            listen_on_port => $listen_on_port, 
+            listen_on => \@tmp_listen_on, 
+            listen_on_port_v6 => $listen_on_v6_port, 
+            listen_on_v6 => \@tmp_listen_on_v6,
+            logging => \@options_logging,
+            custom_opts => \@options_custom,
+            bind_globals => \@options_global, 
+            });
+
+fatal("Cannot update server record '$servername' ($serverid)")
+			       if ($update_ret < 0);
+print "server updated id=$serverid\n" if ($opt_verbose);
+
+
 
 #########################################
 # create zones
@@ -660,26 +733,37 @@ for ($i=0; $i <= $#zones; $i+=1) {
   
    if($alsonotify{$zones[$i]}) {
     push @{$tmphash{also_notify}}, get_array_entries($zone, $alsonotify{$zones[$i]}, \%GLOBAL_ACL, 0);
+#    print "DUMPER-alsonotify\n";
+#    print Dumper($tmphash{also_notify});
   }
   
   if($allowupdate{$zones[$i]}) {
     push @{$tmphash{allow_update}}, get_array_entries($zone, $allowupdate{$zones[$i]}, \%GLOBAL_ACL, 1);
+ #   print "DUMPER-allowupdate\n";
+ #   print Dumper($tmphash{allow_update});
+
   }
   
-  if($allowquery$zones[$i]}) {
+  if($allowquery{$zones[$i]}) {
     push @{$tmphash{allow_query}}, get_array_entries($zone, $allowquery{$zones[$i]}, \%GLOBAL_ACL, 1);
+  #  print "DUMPER-allowquery\n";
+  #  print Dumper($tmphash{allow_query});
   }
   
   if($allowtransfer{$zones[$i]}) {
     push @{$tmphash{allow_transfer}}, get_array_entries($zone, $allowtransfer{$zones[$i]}, \%GLOBAL_ACL, 1);
+   # print "DUMPER-allowtransfer\n";
+   # print Dumper($tmphash{allow_transfer});
   }
 
 
   #$tmphash{allow_update}=$allowupdate{$zones[$i]}  if ($allowupdate{$zones[$i]});
   #$tmphash{also_notify}=$alsonotify{$zones[$i]} if ($alsonotify{$zones[$i]});
 
+  #print Dumper(\%tmphash);
+
   if (($zoneid = add_zone(\%tmphash)) < 0) {
-    print "zone allready exists! skipping\n";
+    print "zone already exists! skipping ($zoneid)\n";
     next;
   }
   print " (id=$zoneid) ";
