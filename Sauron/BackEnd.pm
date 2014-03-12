@@ -1195,7 +1195,7 @@ sub get_zone($$) {
 	       "server,active,dummy,type,reverse,class,name,nnotify," .
 	       "hostmaster,serial,refresh,retry,expire,minimum,ttl," .
 	       "chknames,reversenet,comment,cdate,cuser,mdate,muser," .
-	       "forward,serial_date,flags,rdate,transfer_source",
+	       "forward,serial_date,flags,rdate,transfer_source,transfer_source_v6",
 	       $id,$rec,"id");
   return -1 if ($res < 0);
   fix_bools($rec,"active,dummy,reverse,noreverse");

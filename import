@@ -729,38 +729,27 @@ for ($i=0; $i <= $#zones; $i+=1) {
   $tmphash{name}=$zone;
   $tmphash{chknames}=$check_names;
   $tmphash{nnotify}=$nnotify;
-  $tmphash{masters}=$masters{$zones[$i]}  if ($masters{$zones[$i]});
+  $tmphash{masters}=$masters{$zones[$i]} if ($masters{$zones[$i]});
+  $tmphash{transfer_source}=$transfersource{$zones[$i]} if ($transfersource{$zones[$i]});
+  $tmphash{transfer_source_v6}=$transfersourcev6{$zones[$i]} if ($transfersourcev6{$zones[$i]});
   
    if($alsonotify{$zones[$i]}) {
     push @{$tmphash{also_notify}}, get_array_entries($zone, $alsonotify{$zones[$i]}, \%GLOBAL_ACL, 0);
-#    print "DUMPER-alsonotify\n";
-#    print Dumper($tmphash{also_notify});
   }
   
   if($allowupdate{$zones[$i]}) {
     push @{$tmphash{allow_update}}, get_array_entries($zone, $allowupdate{$zones[$i]}, \%GLOBAL_ACL, 1);
- #   print "DUMPER-allowupdate\n";
- #   print Dumper($tmphash{allow_update});
 
   }
   
   if($allowquery{$zones[$i]}) {
     push @{$tmphash{allow_query}}, get_array_entries($zone, $allowquery{$zones[$i]}, \%GLOBAL_ACL, 1);
-  #  print "DUMPER-allowquery\n";
-  #  print Dumper($tmphash{allow_query});
   }
   
   if($allowtransfer{$zones[$i]}) {
     push @{$tmphash{allow_transfer}}, get_array_entries($zone, $allowtransfer{$zones[$i]}, \%GLOBAL_ACL, 1);
-   # print "DUMPER-allowtransfer\n";
-   # print Dumper($tmphash{allow_transfer});
   }
 
-
-  #$tmphash{allow_update}=$allowupdate{$zones[$i]}  if ($allowupdate{$zones[$i]});
-  #$tmphash{also_notify}=$alsonotify{$zones[$i]} if ($alsonotify{$zones[$i]});
-
-  #print Dumper(\%tmphash);
 
   if (($zoneid = add_zone(\%tmphash)) < 0) {
     print "zone already exists! skipping ($zoneid)\n";
