@@ -89,9 +89,6 @@ sub create_acl($$$$$) {
     @acl_data = get_array_entries("acl/$name", $entries, $acls, 1);
     push @{$data{acl}}, @acl_data;
 
-    print "IN add_acl '$name'\n";
-    #print Dumper(\%data);
-    
     my $res = add_acl(\%data);
     return $res;
 }
@@ -251,8 +248,6 @@ my $options_global;
 my $options_custom;
 my $options_logging;
 
-
-#goto xxx;
 
 foreach $line (@NAMEDCONF) {
   $_ = $line;
@@ -677,9 +672,6 @@ fatal("Cannot update server record '$servername' ($serverid)")
 print "server updated id=$serverid\n" if ($opt_verbose);
 
 
-xxx:
-#$serverid = 
-
 #########################################
 # create zones
 
@@ -698,7 +690,7 @@ for $i (0..$#zones) {
 @zones=@zones2;
 
 
-
+my %zonesid;
 ########################
 # process zones
 for ($i=0; $i <= $#zones; $i+=1) {
@@ -778,8 +770,12 @@ for ($i=0; $i <= $#zones; $i+=1) {
   fatal("cannot get zone record ($zone)") if (get_zone($zoneid,\%zone) < 0);
 
 
+  #Due inserting PTR w/o A or AAAA records
+  $zonesid{$zone} = $zoneid if ($rev eq 'false');
+
   $zonenamemask.='|' if ($zonenamemask);
   $zonenamemask.=$zone if ($rev eq 'false');
+    
 
   #handle master zones
   undef %zonedata;
@@ -792,7 +788,6 @@ for ($i=0; $i <= $#zones; $i+=1) {
   
 
   $rec = $zonedata{$origin};
-  print Dumper($rec);
 
   fatal("No SOA record found in zone $zone! ($origin)")
     unless ($rec && $rec->{SOA});
@@ -834,27 +829,21 @@ for ($i=0; $i <= $#zones; $i+=1) {
   $res = update_zone(\%tmphash);
   fatal("Cannot update zone record '$zone'") if ($res < 0);
 
-  print "ORIGIN: $origin\n";
-  
   if ($rev eq 'true') {
     #handle reverse zone
 
     # add subnet delegations & build PTR map
     foreach $host (keys %zonedata) {
       $rec = $zonedata{$host};
-      print Dumper($rec);
       next if ($host eq $origin);
       $host2=remove_origin($host,$origin);
 
       if (@{$rec->{PTR}} > 0) {
-    print "PTR = " . ($host2 . "." . $origin) . "\n";
 	$ip = arpa2cidr($host2 . "." . $origin);
-    print "ARPA2CIDR= $ip\n";
 	next unless ($ip =~ s/\/32|\/128$//);
 	$ip = ip_compress_address($ip, ip_get_version ($ip));
     $ipworld{$ip}=[] unless ($ipworld{$ip});
 	for $j (0..$#{$rec->{PTR}}) {
-      print "IPW_ADD: $ip = " . $rec->{PTR}->[$j] . "\n";
 	  push @{$ipworld{$ip}}, $rec->{PTR}->[$j];
 	}
       }
@@ -873,8 +862,6 @@ for ($i=0; $i <= $#zones; $i+=1) {
     print "\n";
     next;
   }
-
-  print Dumper(\%ipworld);
 
   # handle normal zone
 
@@ -1045,15 +1032,34 @@ for ($i=0; $i <= $#zones; $i+=1) {
     if (db_insert('srv_entries','type,ref,pri,weight,port,target',\@ilist)<0);
 
 
+
+  # insert NAPTR records to custom zone entries
+
+    my @nlist;
+    foreach $host (keys %zonedata) {
+        $rec = $zonedata{$host};
+        next unless (@{$rec->{NAPTR}} > 0);
+
+        foreach my $naptr (@{$rec->{NAPTR}}) {
+            my $record = "$host\t\t\tIN\tNAPTR\t" . $naptr;
+            push @nlist, [12, $zoneid, $record];  
+        }
+    }
+
+   fatal("cannot insert txt_entries (NAPTR records)!")
+    if (db_insert('txt_entries','type,ref,txt',\@nlist)<0);
+
   # insert alias (CNAME) records
 
   print STDERR "-";
   undef @ilist;
+
   foreach $host (keys %zonedata) {
     $rec = $zonedata{$host};
     next unless ($rec->{CNAME});
 
     $rec2 = $zonedata{$rec->{CNAME}};
+
     unless ($rec2) {
       #warn("cannot find aliased host $host --> $rec->{CNAME}\n");
       $cname2=$rec->{CNAME};
@@ -1067,10 +1073,10 @@ for ($i=0; $i <= $#zones; $i+=1) {
     push @ilist, [$cdate,$user,$zoneid,4,$host2,$class,$alias,$cname2];
     delete $zonedata{$host};
   }
+
   fatal("cannot insert CNAME records")
     if (db_insert('hosts','cdate,cuser,zone,type,domain,class,alias,cname_txt',
 		  \@ilist) < 0);
-
 
 
   # add A records in a_entries
@@ -1079,7 +1085,6 @@ for ($i=0; $i <= $#zones; $i+=1) {
   undef @ilist;
   foreach $host (keys %zonedata) {
     $rec = $zonedata{$host};
-    print Dumper($rec);
     #$reverse='true';
     $reverse='false';
     $hostid=($host eq $origin ? $zonehostid : $rec->{ID});
@@ -1101,10 +1106,12 @@ for ($i=0; $i <= $#zones; $i+=1) {
       if (@{$ipworld{$ip}} > 0) { # check if PTR is needed
 	$reverse='false';
 	for $l (0..$#{$ipworld{$ip}}) {
-	  $reverse='true' if ($host eq $ipworld{$ip}->[$l]);
+        if ($host eq $ipworld{$ip}->[$l]) { 
+	        $reverse='true';
+            delete $ipworld{$ip}->[$l];
+        }
 	}
       }
-      print "PUSH: ID: $hostid IP: $ip REV:$reverse FORWARD: true\n";
       push @ilist, [$hostid,$ip,$reverse,'true'];
     }
 
@@ -1112,24 +1119,51 @@ for ($i=0; $i <= $#zones; $i+=1) {
     $reverse = 'false';
     for $k (0..$#{$rec->{AAAA}}) {
       $ip=$rec->{AAAA}[$k];
-      print "PREMATCH: $ip\n";
-      print Dumper(\%ipworld); 
       if (@{$ipworld{$ip}} > 0) { # check if PTR is needed
    	$reverse='false';
 	for $l (0..$#{$ipworld{$ip}}) {
-      print "TEST FOR $host <=> " . ($ipworld{$ip}->[$l]) . "\n";
-	  $reverse='true' if ($host eq $ipworld{$ip}->[$l]);
-	}
+        if ($host eq $ipworld{$ip}->[$l]) {
+	        $reverse='true';
+            delete $ipworld{$ip}->[$l];
+	    }
+    }
       }
-      print "PUSH: ID: $hostid IP: $ip REV:$reverse FORWARD: true\n";
       push @ilist, [$hostid,$ip,$reverse,'true'];
     }
 
 
   }
-  fatal("cannot insert A records")
-    if (db_insert('a_entries','host,ip,reverse,forward',\@ilist) < 0);
+  
+  # I'll wait with the insertion, because you might need hostid from existing record
+  #fatal("cannot insert A or AAAA records")
+  #  if (db_insert('a_entries','host,ip,reverse,forward',\@ilist) < 0);
 
+  # add PTR withnout A or AAAA entry
+
+    foreach $ip (keys %ipworld) {
+        for $j (0..$#{$ipworld{$ip}}) {
+            $host = $ipworld{$ip}->[$j];
+            #Longest match fist
+            foreach my $re (reverse sort {length($a) <=> length($b)} keys %zonesid)
+            {
+                if ($host =~ /($re\.?)$/) {
+                    $hostid = ($zonedata{$host} ? $zonedata{$host}->{ID} : 0);
+                    if($hostid) {
+                        push @ilist, [$hostid,$ip, 'true','false'];
+                    }
+                    else {
+                        $res=add_host({zone=>$zonesid{$re},type=>1,domain=>remove_origin($host, $1),ip=>[[0,$ip,'true','false']]});
+                        fatal("cannot add host record for ($host)") if ($res < 0);
+                    }
+                    next;
+                }
+            }
+        }
+    }
+
+  #Late insert 
+   fatal("cannot insert A or AAAA records")
+    if (db_insert('a_entries','host,ip,reverse,forward',\@ilist) < 0);
 
 
   # add NS & TXT entries to ns_entries & txt_entries tables accordingly
@@ -1175,8 +1209,6 @@ for ($i=0; $i <= $#zones; $i+=1) {
 
 
 # add host records for orphaned PTR records
-
-print "ZONENAMEMASK: ", $zonenamemask, "\n";
 
 if ($oips_zid > 0) {
   print "Adding host records for orphaned PTRs...(zone id=$oips_zid)\n";

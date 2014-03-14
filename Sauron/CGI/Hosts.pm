@@ -113,8 +113,7 @@ my %host_form = (
 
   {ftype=>0, name=>'Host specific',iff=>['type','[12]']},
   {ftype=>2, tag=>'ns_l', name=>'Name servers (NS)', type=>['domain','text'],
-   fields=>2, 
-   len=>[30,20], empty=>[0,1], elabels=>['NS','comment'], iff=>['type','2']},
+   fields=>2,len=>[30,20], empty=>[0,1], elabels=>['NS','comment'], iff=>['type','2']},
   {ftype=>2, tag=>'wks_l', name=>'WKS', no_empty=>1,
    type=>['text','text','text'], fields=>3, len=>[10,30,10], empty=>[0,0,1],
    elabels=>['Protocol','Services','comment'], iff=>['type','1']},

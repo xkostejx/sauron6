@@ -126,7 +126,7 @@ sub process_zonefile($$$$) {
 	unless ($class =~ /^(IN|CS|CH|HS)$/);
 
     # type
-    unless ($type =~ /^(SOA|A|AAAA|PTR|CNAME|MX|NS|TXT|HINFO|WKS|MB|MG|MD|MF|MINFO|MR|AFSDB|ISDN|RP|RT|X25|PX|SRV)$/) {
+    unless ($type =~ /^(SOA|A|AAAA|PTR|CNAME|MX|NS|TXT|HINFO|WKS|MB|MG|MD|MF|MINFO|MR|AFSDB|ISDN|RP|RT|X25|PX|SRV|NAPTR)$/) {
       if ($ext_flag > 0) {
 	unless ($type =~ /^(DHCP|ALIAS|AREC|ROUTER|PRINTER|BOOTP|INFO|ETHER2?|GROUP|BOOTP|MUUTA[0-9]|TYPE|SERIAL|PCTCP)$/) {
 	  print STDERR "$filename($.): unsupported RR type '$type'\n";
@@ -155,6 +155,8 @@ sub process_zonefile($$$$) {
 
 	      RP => [],
 	      SRV => [],
+         
+          NAPTR => [],
 
 	      SERIAL => '',
 	      TYPE => '',
@@ -255,6 +257,11 @@ sub process_zonefile($$$$) {
       s/\\\"/\"/g;
       push @{$rec->{TXT}}, $_;
     }
+    elsif ($type eq 'NAPTR') {
+      #print "NAPTR '$_'\n";
+      push @{$rec->{NAPTR}}, $_;
+    }
+
     #
     # Otto's (jyu.fi's) extensions for automagic generation of DHCP/BOOTP/etc
     # configs
