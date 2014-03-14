@@ -1065,7 +1065,9 @@ if ($bind_conf) {
 	      }
 	    }
 	  }
-	  if ($mx) {
+      #firstmx for eliminating duplication mx records
+	  if ($mx and !$firstmx{$domain}) {
+        $firstmx{$domain} = 1;
 	    for $k (0 .. $#{$mx}) {
 	      $val=$$mx[$k];
               $val =~ s/\$DOMAIN/$domain/g;
