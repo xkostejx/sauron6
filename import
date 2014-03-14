@@ -16,6 +16,10 @@ use Sauron::Sauron;
 use Data::Dumper;
 use Net::IP qw(:PROC);
 
+
+#print arpa2cidr("f.f.0.0.1.0.0.0.0.0.0.0.0.0.0.0.1.0.0.1.1.0.8.1.8.1.7.0.1.0.0.2.ip6.arpa."),"\n";
+#exit;
+
 load_config();
 
 # if these are not defined, then values are taken from first master zone
@@ -246,6 +250,9 @@ my $directory;
 my $options_global;
 my $options_custom;
 my $options_logging;
+
+
+#goto xxx;
 
 foreach $line (@NAMEDCONF) {
   $_ = $line;
@@ -670,6 +677,8 @@ fatal("Cannot update server record '$servername' ($serverid)")
 print "server updated id=$serverid\n" if ($opt_verbose);
 
 
+xxx:
+#$serverid = 
 
 #########################################
 # create zones
@@ -681,10 +690,10 @@ $loopback_reverse=($loopback->inaddr())[0];
 # (so we can use this information when adding hosts to decide
 #  wheter hosts' A records should have PTR records or not)
 for $i (0..$#zones) {
-  push @zones2, $zones[$i] if ($zones[$i] =~ /\.in-addr\.arpa/);
+  push @zones2, $zones[$i] if ($zones[$i] =~ /\.in-addr\.arpa|\.ip6.arpa/);
 }
 for $i (0..$#zones) {
-  push @zones2, $zones[$i] unless ($zones[$i] =~ /\.in-addr\.arpa/);
+  push @zones2, $zones[$i] unless ($zones[$i] =~ /\.in-addr\.arpa|\.ip6.arpa/);
 }
 @zones=@zones2;
 
@@ -698,9 +707,10 @@ for ($i=0; $i <= $#zones; $i+=1) {
   $zone =~ s/\.$//g;
   if ($zone =~ /\.$/) { $origin=$zone; } else { $origin = $zone . '.'; }
   $rev='false';
-  $rev='true' if ($zone =~ /\.in-addr\.arpa/);
+  $rev='true' if ($zone =~ /\.in-addr\.arpa|\.ip6\.arpa/);
 
   print "zone: '$zone' ";
+  print "REVERSE ZONE! $zone\n" if ($rev eq 'true');
 
   if ($zone =~ /$LOOPBACK_ZONE|$loopback_reverse/) {
     $loopback = 'true';
@@ -779,7 +789,11 @@ for ($i=0; $i <= $#zones; $i+=1) {
 
   process_zonefile($files{$zones[$i]},$zone,\%zonedata,0);
   print " found " . keys(%zonedata) . " domainames in zone\n";
+  
+
   $rec = $zonedata{$origin};
+  print Dumper($rec);
+
   fatal("No SOA record found in zone $zone! ($origin)")
     unless ($rec && $rec->{SOA});
 
@@ -820,21 +834,27 @@ for ($i=0; $i <= $#zones; $i+=1) {
   $res = update_zone(\%tmphash);
   fatal("Cannot update zone record '$zone'") if ($res < 0);
 
-
+  print "ORIGIN: $origin\n";
+  
   if ($rev eq 'true') {
     #handle reverse zone
 
     # add subnet delegations & build PTR map
     foreach $host (keys %zonedata) {
       $rec = $zonedata{$host};
+      print Dumper($rec);
       next if ($host eq $origin);
       $host2=remove_origin($host,$origin);
 
       if (@{$rec->{PTR}} > 0) {
+    print "PTR = " . ($host2 . "." . $origin) . "\n";
 	$ip = arpa2cidr($host2 . "." . $origin);
-	next unless ($ip =~ s/\/32$//);
-	$ipworld{$ip}=[] unless ($ipworld{$ip});
+    print "ARPA2CIDR= $ip\n";
+	next unless ($ip =~ s/\/32|\/128$//);
+	$ip = ip_compress_address($ip, ip_get_version ($ip));
+    $ipworld{$ip}=[] unless ($ipworld{$ip});
 	for $j (0..$#{$rec->{PTR}}) {
+      print "IPW_ADD: $ip = " . $rec->{PTR}->[$j] . "\n";
 	  push @{$ipworld{$ip}}, $rec->{PTR}->[$j];
 	}
       }
@@ -854,6 +874,7 @@ for ($i=0; $i <= $#zones; $i+=1) {
     next;
   }
 
+  print Dumper(\%ipworld);
 
   # handle normal zone
 
@@ -944,13 +965,15 @@ for ($i=0; $i <= $#zones; $i+=1) {
     }
 
     $hosttype=0; # misc / unknown entry type
-    $hosttype=1 if (@{$rec->{A}} > 0); # host
+    #$hosttype=1 if (@{$rec->{A}} > 0); # host
+    $hosttype=1 if (@{$rec->{A}} > 0 || @{$rec->{AAAA}} > 0); # host
     $hosttype=2 if ($nslist ne '' && $host2 ne '@'); # delegated subdomains
-    $hosttype=3 if ($nslist eq '' && @{$rec->{A}} < 1 && @{$rec->{MX}} > 0);
+    #$hosttype=3 if ($nslist eq '' && @{$rec->{A}} < 1 && @{$rec->{MX}} > 0);
+    $hosttype=3 if ($nslist eq '' && @{$rec->{A}} < 1 && @{$rec->{AAAA}} < 1 && @{$rec->{MX}} > 0);
     $hosttype=8 if (@{$rec->{SRV}} > 0);
 
     if ($hosttype == 2) {
-      if ($host =~ /in-addr\.arpa/) {
+      if ($host =~ /in-addr\.arpa|ip6\.arpa/) {
 	print STDERR "\nIGNORING reverse delegation $host in zone $zone \n",
                      " (reverse mapping stuff should be in in-arpa zone)\n";
 	delete $zonedata{$host};
@@ -1056,17 +1079,19 @@ for ($i=0; $i <= $#zones; $i+=1) {
   undef @ilist;
   foreach $host (keys %zonedata) {
     $rec = $zonedata{$host};
-    $reverse='true';
+    print Dumper($rec);
+    #$reverse='true';
+    $reverse='false';
     $hostid=($host eq $origin ? $zonehostid : $rec->{ID});
 
-    if (@{$rec->{A}} < 1) {
-      warn("unexpected host without A records found '$host'")
+    if (@{$rec->{A}} < 1 and @{$rec->{AAAA}} < 1) {
+      warn("unexpected host without A or AAAA records found '$host'")
 	if (@{$rec->{NS}} < 1  &&  @{$rec->{MX}} < 1 && @{$rec->{SRV}} < 1);
       next;
     }
 
     unless ($hostid > 0) {
-      warn("no id found in hash for host $host (while adding A records)!") ;
+      warn("no id found in hash for host $host (while adding A and AAAA records)!") ;
       next;
     }
 
@@ -1079,8 +1104,27 @@ for ($i=0; $i <= $#zones; $i+=1) {
 	  $reverse='true' if ($host eq $ipworld{$ip}->[$l]);
 	}
       }
+      print "PUSH: ID: $hostid IP: $ip REV:$reverse FORWARD: true\n";
       push @ilist, [$hostid,$ip,$reverse,'true'];
     }
+
+
+    $reverse = 'false';
+    for $k (0..$#{$rec->{AAAA}}) {
+      $ip=$rec->{AAAA}[$k];
+      print "PREMATCH: $ip\n";
+      print Dumper(\%ipworld); 
+      if (@{$ipworld{$ip}} > 0) { # check if PTR is needed
+   	$reverse='false';
+	for $l (0..$#{$ipworld{$ip}}) {
+      print "TEST FOR $host <=> " . ($ipworld{$ip}->[$l]) . "\n";
+	  $reverse='true' if ($host eq $ipworld{$ip}->[$l]);
+	}
+      }
+      print "PUSH: ID: $hostid IP: $ip REV:$reverse FORWARD: true\n";
+      push @ilist, [$hostid,$ip,$reverse,'true'];
+    }
+
 
   }
   fatal("cannot insert A records")
@@ -1132,6 +1176,8 @@ for ($i=0; $i <= $#zones; $i+=1) {
 
 # add host records for orphaned PTR records
 
+print "ZONENAMEMASK: ", $zonenamemask, "\n";
+
 if ($oips_zid > 0) {
   print "Adding host records for orphaned PTRs...(zone id=$oips_zid)\n";
 
@@ -1163,8 +1209,5 @@ unless ($opt_notransaction) {
 #print STDERR "Vacuuming...";
 #db_vacuum();
 print STDERR "\n";
-
-
-exit(0);
 
 # eof

@@ -287,6 +287,7 @@ sub arpa2cidr($) {
     $cidr .= ":" if ($mask < 32 and $mask % 4 == 0);
     chop($cidr) if $mask == 32;
 
+    #return ip_compress_address($cidr . "/" . $mask_b);
     return $cidr . "/" . $mask_b;
   }
   

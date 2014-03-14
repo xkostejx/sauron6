@@ -785,7 +785,7 @@ sub update_server($) {
   my($rec) = @_;
   my($r,$id);
 
-  print Dumper($rec);
+  #print Dumper($rec);
 
   del_std_fields($rec);
   delete $rec->{dhcp_flags};
