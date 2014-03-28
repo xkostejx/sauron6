@@ -14,6 +14,7 @@ use Sauron::UtilDhcp;
 use Sauron::BackEnd;
 use Sauron::Sauron;
 use Data::Dumper;
+use Net::IP;
 
 load_config();
 
@@ -60,9 +61,6 @@ if ($dhcpdf =~ /(^.*\/)/) {
 # parse named.conf
 undef %data;
 process_dhcpdconf($dhcpdf,\%data);
-
-print Dumper (\%data);
-exit;
 
 unless ($opt_notransaction) {
   db_begin();
@@ -200,7 +198,7 @@ foreach $key (sort keys %{$data{class}}) {
 
   $res = add_group({server=>$serverid,name=>$key,type=>3,dhcp=>\@q});
   fatal("cannot add CLASS ($key)") if ($res < 0);
-  $classes{$key}=$res;
+  $classes{$key}=$res if $res;
 }
 
 # dhcp subclass
@@ -216,13 +214,39 @@ foreach $key (sort keys %{$data{subclass}}) {
   foreach $line (@{$rec}) {
     next unless ($line =~ /;\s*$/);
     #UWB ~ match pick-first-value (option dhcp-client-identifier, hardware) 
-    # 1:00:11:22:33:44:55 = hardware ethernet 11:22:33:44:55:66;  FIXIT;-)
+    # 1:00:11:22:33:44:55 = hardware ethernet 00:11:22:33:44:55;  FIXIT;-)
     $line =~ s/^1://;   
+    $line =~ s/://g;   
     $line =~ s/;\s*$//;
-    $sclass2class{$line} = ($classes{$key} ? $classes{$key} : -1);
+    #sclass2class{00:11:22:33:44:55} = 1
+    push @{$sclass2class{$line}}, [undef, $classes{$key}, 2] if $classes{$key};
   }
 }
 
+# dhcp pools
+
+$c = keys %{$data{'pool'}};
+print "Found $c pools\n";
+
+foreach $key (sort keys %{$data{pool}}) {
+  $rec = $data{pool}->{$key};
+  print "pool: $key\n" if ($opt_verbose);
+
+  undef @q;
+  foreach $line (@{$rec}) {
+    next unless ($line =~ /;\s*$/);
+    $line =~ s/;\s*$//;
+    if($line =~ /^range\s+(.*)\s+(.*)/) {
+        $range = "$1 - $2";
+        next;
+    }
+    push @q, [0,$line,''];
+  }
+
+  $res = add_group({server=>$serverid,name=>$key,type=>2,dhcp=>\@q});
+  fatal("cannot add POOL ($key)") if ($res < 0);
+  $pools{$range} = $res if $res;
+}
 
 # hosts
 
@@ -262,13 +286,24 @@ foreach $key (keys %{$data{host}}) {
       foreach $byte (@tmp){ $mac .= sprintf ("%02s", $byte); }
       $ether=uc($mac);
     } else {
-      push @q, $line;
+      push @q, [undef, $line, '', 2];
     }
 
   }
   next unless ($ip && $ether);
+
+  #Add subclass
+  if($sclass2class{$ether}) {
+    unshift @{$sclass2class{$ether}}, ['SubGroup'];
+  }
+  else {
+    @sclasess = [];
+  }
+
+  unshift @q, ['DHCP', 'Comments'] if @q > 0;
+
   print "host: $key ip=$ip,ether=$ether,groupid=$id\n" if ($opt_verbose);
-  $hosts{$ip}=[$ether,$id,$key];
+  $hosts{$ip}=[$ether,$id,$key,$sclass2class{$ether}, \@q];
 }
 
 
@@ -277,7 +312,7 @@ undef @list;
 db_query("SELECT h.id,h.domain,a.ip FROM hosts h,zones z, a_entries a " .
 	 "WHERE z.server=$serverid AND h.zone=z.id AND h.type=1 " .
 	 " AND a.host=h.id ORDER BY a.ip",\@list);
-print "found ",int(@list)," hosts\n";
+print "Found ",int(@list)," hosts\n";
 
 if (@list > 0) {
   for $i (0..$#list) {
@@ -321,8 +356,7 @@ foreach $ip (keys %hostrefs) {
     print "Updating $domain ($ip,$id) <-- ",
           "$macs{$hosts{$ip}[0]},$hosts{$ip}[1],$hosts{$ip}[2]\n"
 	    if ($opt_verbose);
-    $res = update_host({id=>$id,ether_alias=>$macs{$hosts{$ip}[0]},
-			grp=>$hosts{$ip}[1]});
+    $res = update_host({id=>$id,ether_alias=>$macs{$hosts{$ip}[0]}, grp=>$hosts{$ip}[1], subgroups=> \@{$hosts{$ip}[3]}, dhcp_l=>$hosts{$ip}[4]});
     fatal("cannot update host: $domain ($res)\n".db_errormsg()) if ($res < 0);
     next;
   }
@@ -330,10 +364,33 @@ foreach $ip (keys %hostrefs) {
 
   print "Updating $domain ($ip,$id) <-- ",
         "$hosts{$ip}[0],$hosts{$ip}[1],$hosts{$ip}[2]\n" if ($opt_verbose);
-  $res = update_host({id=>$id,ether=>$hosts{$ip}[0],grp=>$hosts{$ip}[1]});
+  $res = update_host({id=>$id,ether=>$hosts{$ip}[0],grp=>$hosts{$ip}[1], subgroups=> \@{$hosts{$ip}[3]}, dhcp_l=>$hosts{$ip}[4]});
   fatal("cannot update host: $domain ($res)\n".db_errormsg()) if ($res < 0);
 }
 
+print "Updating dynamic pools members\n";
+
+foreach my $pool (keys %pools) {
+    $pool =~ /(.*)\s\-\s(.*)/;
+    $pool_s = $1;
+    $pool_e = $2;
+    $pid = $pools{$pool};
+
+    db_query("SELECT h.id,h.domain,a.ip FROM hosts h,zones z, a_entries a " .
+         "WHERE z.server=$serverid AND h.zone=z.id AND h.type=1 " .
+         " AND a.host=h.id AND a.ip >= inet '$pool_s' AND a.ip <= inet '$pool_e'" . 
+         " ORDER BY a.ip",\@pool_members);
+    print "Found ",int(@pool_members)," hosts in range '$pool'\n" if ($opt_verbose);
+
+    foreach my $m (@pool_members) {
+        $id = $$m[0];
+        $domain = $$m[1];
+        $ip = $$m[2];
+        print "Updating pool grp $domain ($ip,$id) <-- GRP: $pid\n" if ($opt_verbose);
+        $res = update_host({id=>$id,grp=>$pid});
+        fatal("cannot update hosts pool: $domain ($res)\n".db_errormsg()) if ($res < 0);
+    }
+}
 
 print "Updating routers...\n";
 foreach $ip (keys %routers) {
@@ -345,7 +402,6 @@ foreach $ip (keys %routers) {
   fatal("cannot update router info for: $domain ($ip)")
     if (update_host({id=>$id,router=>1}) < 0);
 }
-
 
 unless ($opt_notransaction) {
   db_ignore_begin_and_commit(0);

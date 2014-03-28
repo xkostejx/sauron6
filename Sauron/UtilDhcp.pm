@@ -31,7 +31,6 @@ sub process_dhcpdconf($$) {
 
   fatal("cannot read conf file: $filename") unless (-r $filename);
   open($fh,$filename) || fatal("cannot open conf file: $filename");
-  $$data{'shared-network'}->{'"#nonshared"'}=[];
 
   $tmp='';
   while (<$fh>) {
@@ -74,6 +73,7 @@ sub process_line($$$) {
 
   return if ($line =~ /^\s*$/);
   $line =~ s/(^\s+|\s+$)//g;
+  $line =~ s/\"//g;
 
 
   if ($line =~ /^(\S+)\s+(\S.*)?{$/) {
@@ -87,15 +87,12 @@ sub process_line($$$) {
       $rest="group-" . $$state{groupcounter};
     }
     elsif ($block =~ /^pool/) {
-      $tmp=$$state{'shared-network'}->[0];
-      if ($tmp) {
-	unshift @{$$data{POOLS}->{$tmp}}, [];
-      } else {
-	unshift @{$$data{POOLS}->{'#nonshared'}}, [] unless $$data{POOLS}->{'#nonshared'};
+      $$state{poolcounter}++;
+      $rest="pool-" . $$state{poolcounter};
+      
 #warn("pools not under shared-network aren't currently supported");
-      }
     }
-    print "begin '$block:$rest'\n";
+    #print "begin '$block:$rest'\n";
     unshift @{$$state{BLOCKS}}, $block;
     #print "BLOCKS: " . Dumper($$state{BLOCKS});
     unshift @{$$state{$block}}, $rest;
@@ -110,23 +107,7 @@ sub process_line($$$) {
       if ($$state{'shared-network'}->[0]) {
          push @{$$data{$block}->{$rest}}, "VLAN $$state{'shared-network'}->[0]";
       }
-      else {
-         push @{$$data{$block}->{$rest}}, "VLAN #nonshared";
-      }
       $$state{lastsubnet} = $rest;
-    }
-    if ($block =~ /^pool/) {
-      if($$state{lastsubnet}) {
-        if($$state{'shared-network'}->[0]) {
-            push @{$$data{POOLS}->{$$state{'shared-network'}->[0]}->[0]}, "SUBNET $$state{lastsubnet}";
-        }
-        else {
-            push @{$$data{POOLS}->{'#nonshared'}->[0]}, "SUBNET $$state{lastsubnet}"; 
-        } 
-      }
-      else {
-           warn("Pool isn't in subnet section!\n");
-      }
     }
 
     return 0;
@@ -136,7 +117,7 @@ sub process_line($$$) {
   $rest=$$state{$block}->[0];
 
   if ($line =~ /^\s*}\s*$/) {
-    print "end '$block:$rest'\n";
+    #print "end '$block:$rest'\n";
     unless (@{$$state{BLOCKS}} > 0) {
       warn("mismatched parenthesis");
       return -1;
@@ -147,10 +128,11 @@ sub process_line($$$) {
   }
 
   $block='GLOBAL' unless ($block);
-  print "line($block:$rest) '$line'\n";
+  #print "line($block:$rest) '$line'\n";
 
   if ($block eq 'GLOBAL') {
-    if($line =~ /subclass\s+\"(.*)\"\s+(.*)/) {
+    #if($line =~ /subclass\s+\"(.*)\"\s+(.*)/) {
+    if($line =~ /subclass\s+(.*)\s+(.*)/) {
         push @{$$data{'subclass'}->{$1}}, $2; 
     }
     else {
@@ -161,13 +143,7 @@ sub process_line($$$) {
     push @{$$data{$block}->{$rest}}, $line;
   }
   elsif ($block =~ /^pool/) {
-    $tmp=$$state{'shared-network'}->[0];
-    if($tmp) {
-        push @{$$data{POOLS}->{$tmp}->[0]}, $line;
-    }
-    else {
-        push @{$$data{POOLS}->{'#nonshared'}->[0]}, $line;
-    }
+    push @{$$data{$block}->{$rest}}, $line;
   }
   elsif ($block =~ /^host/) {
     push @{$$data{$block}->{$rest}}, $line;
