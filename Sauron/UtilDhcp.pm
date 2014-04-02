@@ -76,7 +76,8 @@ sub process_line($$$) {
   $line =~ s/\"//g;
 
 
-  if ($line =~ /^(\S+)\s+(\S.*)?{$/) {
+  #if ($line =~ /^(\S+)\s+(\S.*)?{$/) {
+  if ($line =~ /^(\S+)\s?(\s+\S.*)?{$/) {
     $block=lc($1);
     #print "BLOCK: $block\n";
     ($rest=$2) =~ s/^\s+|\s+$//g;
@@ -86,7 +87,7 @@ sub process_line($$$) {
       $$state{groupcounter}++;
       $rest="group-" . $$state{groupcounter};
     }
-    elsif ($block =~ /^pool/) {
+    elsif ($block =~ /^pool[6]?/) {
       $$state{poolcounter}++;
       $rest="pool-" . $$state{poolcounter};
       
@@ -103,7 +104,7 @@ sub process_line($$$) {
     if ($block =~ /^host/) {
       push @{$$data{$block}->{$rest}}, "GROUP $$state{group}->[0]" if ($$state{group}->[0]);
     }
-    if ($block =~ /^subnet/) {
+    if ($block =~ /^subnet[6]?/) {
       if ($$state{'shared-network'}->[0]) {
          push @{$$data{$block}->{$rest}}, "VLAN $$state{'shared-network'}->[0]";
       }
@@ -117,7 +118,7 @@ sub process_line($$$) {
   $rest=$$state{$block}->[0];
 
   if ($line =~ /^\s*}\s*$/) {
-    #print "end '$block:$rest'\n";
+    print "end '$block:$rest'\n";
     unless (@{$$state{BLOCKS}} > 0) {
       warn("mismatched parenthesis");
       return -1;
@@ -139,10 +140,10 @@ sub process_line($$$) {
         push @{$$data{GLOBAL}}, $line;
     }
   }
-  elsif ($block =~ /^(subnet|shared-network|group|class)$/) {
+  elsif ($block =~ /^(subnet[6]?|shared-network|group|class)$/) {
     push @{$$data{$block}->{$rest}}, $line;
   }
-  elsif ($block =~ /^pool/) {
+  elsif ($block =~ /^pool[6]?/) {
     push @{$$data{$block}->{$rest}}, $line;
   }
   elsif ($block =~ /^host/) {

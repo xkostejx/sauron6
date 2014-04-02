@@ -183,6 +183,7 @@ sub db_encode_str($) {
   return "NULL" if ($str eq '');
   $str =~ s/\\/\\\\/g;
   $str =~ s/\'/\\\'/g;
+  #$str =~ s/\'/\'\'/g;
   return "'" . $str . "'";
 }
 
