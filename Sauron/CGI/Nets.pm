@@ -138,6 +138,10 @@ my %vlan_form=(
   {ftype=>2, tag=>'dhcp_l', name=>'VLAN specific DHCP entries',
    type=>['text','text'], fields=>2, maxlen=>[200,20],
    len=>[50,20], empty=>[0,1], elabels=>['DHCP','comment']},
+  {ftype=>2, tag=>'dhcp_l6', name=>'VLAN specific DHCPv6 entries',
+   type=>['text','text'], fields=>2, maxlen=>[200,20],
+   len=>[50,20], empty=>[0,1], elabels=>['DHCP','comment']},
+
 
   {ftype=>0, name=>'Record info', no_edit=>1},
   {ftype=>4, name=>'Record created', tag=>'cdate_str', no_edit=>1},

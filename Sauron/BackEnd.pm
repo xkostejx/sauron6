@@ -751,8 +751,8 @@ sub get_server($$) {
 		  "type=11 AND ref=$id ORDER BY id",$rec,'custom_opts');
   get_array_field("txt_entries",3,"id,txt,comment","TXT,Comments",
 		  "type=13 AND ref=$id ORDER BY id",$rec,'bind_globals');
-  get_array_field("dhcp_entries6",3,"id,dhcp,comment","DHCP6,Comments",
-		  "type=1 AND ref=$id ORDER BY id",$rec,'dhcp6');
+  get_array_field("dhcp_entries",3,"id,dhcp,comment","DHCP6,Comments",
+		  "type=11 AND ref=$id ORDER BY id",$rec,'dhcp6');
 
   get_aml_field($id,14,$id,$rec,'allow_query_cache');
   get_aml_field($id,15,$id,$rec,'allow_notify');
@@ -827,8 +827,8 @@ sub update_server($) {
 		        "1,$id");
   if ($r < 0) { db_rollback(); return -13; }
   # dhcp6
-  $r=update_array_field("dhcp_entries6",3,"dhcp,comment,type,ref",'dhcp6',$rec,
-		        "1,$id");
+  $r=update_array_field("dhcp_entries",3,"dhcp,comment,type,ref",'dhcp6',$rec,
+		        "11,$id");
   if ($r < 0) { db_rollback(); return -132; }
   # txt
   $r=update_array_field("txt_entries",3,"txt,comment,type,ref",
@@ -902,8 +902,8 @@ sub add_server($) {
 			 'type,ref',"1,$id");
   if ($res < 0) { db_rollback(); return -11; }
   # dhcp6
-  $res = add_array_field('dhcp_entries6','dhcp,comment','dhcp6',$rec,
-			 'type,ref',"1,$id");
+  $res = add_array_field('dhcp_entries','dhcp,comment','dhcp6',$rec,
+			 'type,ref',"11,$id");
   if ($res < 0) { db_rollback(); return -11; }
   # txt
   $res = add_array_field('txt_entries','txt,comment','txt',$rec,
@@ -999,28 +999,28 @@ sub delete_server($) {
   if ($res < 0) { db_rollback(); return -8; }
 
 # dhcp_entries6
-  $res=db_exec("DELETE FROM dhcp_entries6 WHERE type=1 AND ref=$id;");
-  if ($res < 0) { db_rollback(); return -3; }
-  $res=db_exec("DELETE FROM dhcp_entries6 WHERE id IN ( " .
-	        "SELECT a.id FROM dhcp_entries6 a, zones z " .
-	        "WHERE z.server=$id AND a.type=2 AND a.ref=z.id);");
-  if ($res < 0) { db_rollback(); return -4; }
-  $res=db_exec("DELETE FROM dhcp_entries6 WHERE id IN ( " .
-	        "SELECT a.id FROM dhcp_entries6 a, zones z, hosts h " .
-	        "WHERE z.server=$id AND h.zone=z.id AND a.type=3 " .
+  $res=db_exec("DELETE FROM dhcp_entries WHERE type=11 AND ref=$id;");
+  if ($res < 0) { db_rollback(); return -13; }
+  $res=db_exec("DELETE FROM dhcp_entries WHERE id IN ( " .
+	        "SELECT a.id FROM dhcp_entries a, zones z " .
+	        "WHERE z.server=$id AND a.type=12 AND a.ref=z.id);");
+  if ($res < 0) { db_rollback(); return -14; }
+  $res=db_exec("DELETE FROM dhcp_entries WHERE id IN ( " .
+	        "SELECT a.id FROM dhcp_entries a, zones z, hosts h " .
+	        "WHERE z.server=$id AND h.zone=z.id AND a.type=13 " .
 	        " AND a.ref=h.id);");
-  if ($res < 0) { db_rollback(); return -5; }
-  $res=db_exec("DELETE FROM dhcp_entries6 WHERE id IN ( " .
-	        "SELECT a.id FROM dhcp_entries6 a, nets n " .
-	        "WHERE n.server=$id AND a.type=4 AND a.ref=n.id);");
-  if ($res < 0) { db_rollback(); return -6; }
-  $res=db_exec("DELETE FROM dhcp_entries6 WHERE id IN ( " .
-	        "SELECT a.id FROM dhcp_entries6 a, groups g " .
-	        "WHERE g.server=$id AND a.type=5 AND a.ref=g.id);");
-  if ($res < 0) { db_rollback(); return -7; }
-  $res=db_exec("DELETE FROM dhcp_entries6 WHERE id IN ( " .
+  if ($res < 0) { db_rollback(); return -15; }
+  $res=db_exec("DELETE FROM dhcp_entries WHERE id IN ( " .
+	        "SELECT a.id FROM dhcp_entries a, nets n " .
+	        "WHERE n.server=$id AND a.type=14 AND a.ref=n.id);");
+  if ($res < 0) { db_rollback(); return -16; }
+  $res=db_exec("DELETE FROM dhcp_entries WHERE id IN ( " .
+	        "SELECT a.id FROM dhcp_entries a, groups g " .
+	        "WHERE g.server=$id AND a.type=15 AND a.ref=g.id);");
+  if ($res < 0) { db_rollback(); return -17; }
+  $res=db_exec("DELETE FROM dhcp_entries WHERE id IN ( " .
 	        "SELECT a.id FROM dhcp_entries a, vlans v " .
-	        "WHERE v.server=$id AND a.type=6 AND a.ref=v.id);");
+	        "WHERE v.server=$id AND a.type=16 AND a.ref=v.id);");
   if ($res < 0) { db_rollback(); return -8; }
 
 
@@ -1776,6 +1776,8 @@ sub get_host($$) {
 		  "type=2 AND ref=$id ORDER BY id",$rec,'txt_l');
   get_array_field("dhcp_entries",3,"id,dhcp,comment","DHCP,Comments",
 		  "type=3 AND ref=$id ORDER BY id",$rec,'dhcp_l');
+  get_array_field("dhcp_entries",3,"id,dhcp,comment","DHCP,Comments",
+		  "type=13 AND ref=$id ORDER BY id",$rec,'dhcp_l6');
   get_array_field("printer_entries",3,"id,printer,comment","PRINTER,Comments",
 		  "type=2 AND ref=$id ORDER BY printer",$rec,'printer_l');
   get_array_field("srv_entries",6,"id,pri,weight,port,target,comment",
@@ -1933,6 +1935,10 @@ sub update_host($) {
   $r=update_array_field("group_entries",2,"grp,host",
 			'subgroups',$rec,"$id");
   if ($r < 0) { db_rollback(); return -22; }
+
+  $r=update_array_field("dhcp_entries",3,"dhcp,comment,type,ref",
+			'dhcp_l6',$rec,"13,$id");
+  if ($r < 0) { db_rollback(); return -23; }
 
   return db_commit();
 }
@@ -2427,6 +2433,9 @@ sub get_group($$) {
   get_array_field("printer_entries",3,"id,printer,comment","PRINTER,Comments",
 		  "type=1 AND ref=$id ORDER BY printer",$rec,'printer');
 
+  get_array_field("dhcp_entries",3,"id,dhcp,comment","DHCP,Comments",
+		  "type=15 AND ref=$id ORDER BY id",$rec,'dhcp6');
+  
   add_std_fields($rec);
   return 0;
 }
@@ -2449,6 +2458,10 @@ sub update_group($) {
 			'printer',$rec,"1,$id");
   if ($r < 0) { db_rollback(); return -17; }
 
+  $r=update_array_field("dhcp_entries",3,"dhcp,comment,type,ref",
+			'dhcp6',$rec,"15,$id");
+  if ($r < 0) { db_rollback(); return -16; }
+  
   return db_commit();
 }
 
@@ -2468,6 +2481,11 @@ sub add_group($) {
 			 'type,ref',"5,$id");
   if ($res < 0) { db_rollback(); return -3; }
 
+  # dhcp_entries
+  $res = add_array_field('dhcp_entries','dhcp,comment','dhcp6',$rec,
+			 'type,ref',"15,$id");
+  if ($res < 0) { db_rollback(); return -3; }
+  
   # printer_entries
   $res = add_array_field('printer_entries','printer,comment','printer',$rec,
 			 'type,ref',"1,$id");
@@ -2488,7 +2506,7 @@ sub delete_group($) {
   db_begin();
 
   # dhcp_entries
-  $res=db_exec("DELETE FROM dhcp_entries WHERE type=5 AND ref=$id");
+  $res=db_exec("DELETE FROM dhcp_entries WHERE (type=5 OR type=15) AND ref=$id");
   if ($res < 0) { db_rollback(); return -1; }
   # printer_entries
   $res=db_exec("DELETE FROM printer_entries WHERE type=1 AND ref=$id");
@@ -2687,7 +2705,7 @@ sub get_net($$) {
   fix_bools($rec,"subnet,no_dhcp,dummy");
   get_array_field("dhcp_entries",3,"id,dhcp,comment","DHCP,Comment",
 		  "type=4 AND ref=$id ORDER BY id",$rec,'dhcp_l');
-
+  
   $rec->{private_flag} = ($rec->{type} & 0x01 ? 1 : 0);
   add_std_fields($rec);
   return 0;
@@ -2720,7 +2738,7 @@ sub update_net($) {
   $r=update_array_field("dhcp_entries",3,"dhcp,comment,type,ref",
 			'dhcp_l',$rec,"4,$id");
   if ($r < 0) { db_rollback(); return -10; }
-
+  
   return db_commit();
 }
 
@@ -2793,6 +2811,8 @@ sub get_vlan($$) {
 
   get_array_field("dhcp_entries",3,"id,dhcp,comment","DHCP,Comment",
 		  "type=6 AND ref=$id ORDER BY id",$rec,'dhcp_l');
+  get_array_field("dhcp_entries",3,"id,dhcp,comment","DHCP,Comment",
+		  "type=16 AND ref=$id ORDER BY id",$rec,'dhcp_l6');
 
   add_std_fields($rec);
   return 0;
@@ -2814,6 +2834,10 @@ sub update_vlan($) {
 			'dhcp_l',$rec,"6,$id");
   if ($r < 0) { db_rollback(); return -10; }
 
+  $r=update_array_field("dhcp_entries",3,"dhcp,comment,type,ref",
+			'dhcp_l6',$rec,"16,$id");
+  if ($r < 0) { db_rollback(); return -10; }
+
   return db_commit();
 }
 
@@ -2833,6 +2857,13 @@ sub add_vlan($) {
     $res=db_exec("INSERT INTO dhcp_entries (type,ref,dhcp) " .
 		 "VALUES(6,$id,'$rec->{dhcp_l}[$i][1]')");
     if ($res < 0) { db_rollback(); return -3; }
+  }
+
+# dhcp_entries6
+  for $i (0..$#{$rec->{dhcp_l6}}) {
+    $res=db_exec("INSERT INTO dhcp_entries (type,ref,dhcp) " .
+		 "VALUES(16,$id,'$rec->{dhcp_l6}[$i][1]')");
+    if ($res < 0) { db_rollback(); return -4; }
   }
 
   return -10 if (db_commit() < 0);

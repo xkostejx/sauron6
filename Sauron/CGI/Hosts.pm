@@ -130,6 +130,10 @@ my %host_form = (
   {ftype=>2, tag=>'dhcp_l', name=>'DHCP entries', no_empty=>1,
    type=>['text','text'], fields=>2,len=>[50,20], maxlen=>[200,20],
    empty=>[0,1],elabels=>['DHCP','comment'], iff=>['type','[15]']},
+  {ftype=>2, tag=>'dhcp_l6', name=>'DHCPv6 entries', no_empty=>1,
+   type=>['text','text'], fields=>2,len=>[50,20], maxlen=>[200,20],
+   empty=>[0,1],elabels=>['DHCP','comment'], iff=>['type','[15]']},
+
 
   {ftype=>0, name=>'Aliases', no_edit=>1, iff=>['type','1']},
   {ftype=>8, tag=>'alias_l', name=>'Aliases', fields=>3, iff=>['type','1']},
