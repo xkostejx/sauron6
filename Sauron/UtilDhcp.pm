@@ -82,14 +82,14 @@ sub process_line($$$) {
     #print "BLOCK: $block\n";
     ($rest=$2) =~ s/^\s+|\s+$//g;
     #print "REST: $rest\n";
-    if ($block =~ /^group/) {
+    if ($block =~ /^(group)/) {
       # generate name for groups
       $$state{groupcounter}++;
-      $rest="group-" . $$state{groupcounter};
+      $rest="$1-" . $$state{groupcounter};
     }
-    elsif ($block =~ /^pool[6]?/) {
+    elsif ($block =~ /^(pool[6]?)/) {
       $$state{poolcounter}++;
-      $rest="pool-" . $$state{poolcounter};
+      $rest="$1-" . $$state{poolcounter};
       
 #warn("pools not under shared-network aren't currently supported");
     }
@@ -118,7 +118,7 @@ sub process_line($$$) {
   $rest=$$state{$block}->[0];
 
   if ($line =~ /^\s*}\s*$/) {
-    print "end '$block:$rest'\n";
+    #print "end '$block:$rest'\n";
     unless (@{$$state{BLOCKS}} > 0) {
       warn("mismatched parenthesis");
       return -1;

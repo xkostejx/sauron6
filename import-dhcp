@@ -197,7 +197,7 @@ else {
 
       print "net: $net ($name) (vlan id=$id)\n" if ($opt_verbose);
       $res = add_net({server=>$serverid,netname=>$name,name=>$name,
-              net=>$net,subnet=>'true',vlan=>$id, dhcp_l=>\@q});
+              net=>$net,subnet=>'true',vlan=>$id, dhcp_l6=>\@q});
       fatal("cannot add NET ($net)") if ($res < 0);
     }
 }
@@ -218,7 +218,8 @@ foreach $key (sort keys %{$data{group}}) {
     push @q, [0,$line,''];
   }
 
-  $res = add_group({server=>$serverid,name=>$key,type=>1,dhcp=>\@q});
+  $res = add_group({server=>$serverid,name=>$key,type=>1,dhcp=>\@q}) if !$opt_dhcp6;
+  $res = add_group({server=>$serverid,name=>$key,type=>1,dhcp6=>\@q}) if $opt_dhcp6;
   fatal("cannot add GROUP ($key)") if ($res < 0);
   $groups{$key}=$res;
 }
@@ -239,7 +240,8 @@ foreach $key (sort keys %{$data{class}}) {
     push @q, [0,$line,''];
   }
 
-  $res = add_group({server=>$serverid,name=>$key,type=>3,dhcp=>\@q});
+  $res = add_group({server=>$serverid,name=>$key,type=>3,dhcp=>\@q}) if !$opt_dhcp6;
+  $res = add_group({server=>$serverid,name=>$key,type=>3,dhcp6=>\@q}) if $opt_dhcp6;
   fatal("cannot add CLASS ($key)") if ($res < 0);
   $classes{$key}=$res if $res;
 }
@@ -291,7 +293,8 @@ foreach $key (sort keys %{$data{$pool_section}}) {
     push @q, [0,$line,''];
   }
 
-  $res = add_group({server=>$serverid,name=>$key,type=>2,dhcp=>\@q});
+  $res = add_group({server=>$serverid,name=>$key,type=>2,dhcp=>\@q}) if !$opt_dhcp6;
+  $res = add_group({server=>$serverid,name=>$key,type=>2,dhcp6=>\@q}) if $opt_dhcp6;
   fatal("cannot add POOL ($key)") if ($res < 0);
   $pools{$range} = $res if $res;
 }
@@ -407,7 +410,8 @@ foreach $ip (keys %hostrefs) {
     print "Updating $domain ($ip,$id) <-- ",
           "$macs{$hosts{$ip}[0]},$hosts{$ip}[1],$hosts{$ip}[2]\n"
 	    if ($opt_verbose);
-    $res = update_host({id=>$id,ether_alias=>$macs{$hosts{$ip}[0]}, grp=>$hosts{$ip}[1], subgroups=> \@{$hosts{$ip}[3]}, dhcp_l=>$hosts{$ip}[4]});
+    $res = update_host({id=>$id,ether_alias=>$macs{$hosts{$ip}[0]}, grp=>$hosts{$ip}[1], subgroups=> \@{$hosts{$ip}[3]}, dhcp_l=>$hosts{$ip}[4]}) if !$opt_dhcp6;
+    $res = update_host({id=>$id,ether_alias=>$macs{$hosts{$ip}[0]}, grp=>$hosts{$ip}[1], subgroups=> \@{$hosts{$ip}[3]}, dhcp_l6=>$hosts{$ip}[4]}) if $opt_dhcp6;
     fatal("cannot update host: $domain ($res)\n".db_errormsg()) if ($res < 0);
     next;
   }
@@ -419,7 +423,7 @@ foreach $ip (keys %hostrefs) {
     $res = update_host({id=>$id,ether=>$hosts{$ip}[0],grp=>$hosts{$ip}[1], subgroups=> \@{$hosts{$ip}[3]}, dhcp_l=>$hosts{$ip}[4]});
   } 
   else {
-    $res = update_host({id=>$id, duid=>$hosts{$ip}[0],grp=>$hosts{$ip}[1], subgroups=> \@{$hosts{$ip}[3]}, dhcp_l=>$hosts{$ip}[4]});
+    $res = update_host({id=>$id, duid=>$hosts{$ip}[0],grp=>$hosts{$ip}[1], subgroups=> \@{$hosts{$ip}[3]}, dhcp_l6=>$hosts{$ip}[4]});
   }
   fatal("cannot update host: $domain ($res)\n".db_errormsg()) if ($res < 0);
 }
