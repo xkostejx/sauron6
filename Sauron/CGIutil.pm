@@ -141,12 +141,17 @@ sub form_check_field($$$) {
   } elsif ($type eq 'path') {
     return 'valid pathname required!'
       unless ($value =~ /^(|\S+\/)$/);
-  } elsif ($type eq 'ip') {
+  } elsif ($type =~ /ip[46]?/) {
+     my $ipversion = ip_get_version($value);
+     return 'IPv4 address required!' if $type eq 'ip4' and $ipversion == 6;
+     return 'IPv6 address required!' if $type eq 'ip6' and $ipversion == 4;
+      
       if ($inetNet eq 'MANUAL' || !$inetNet ) {
-        $inetFamily4 = (ip_get_version($value) == 4 ? 1 : 0);
-        $inetFamily6 = (ip_get_version($value) == 6 ? 1 : 0);
+        $inetFamily4 = ($ipversion == 4 ? 1 : 0);
+        $inetFamily6 = ($ipversion == 6 ? 1 : 0);
       }        
-    return 'valid IP number required!' unless is_cidr($value);
+
+    return 'valid IP address required!' unless is_cidr($value);
   } elsif ($type eq 'cidr') {
     return 'valid CIDR (IP) required!' unless (is_cidr($value));
   } elsif ($type eq 'text') {
@@ -247,7 +252,7 @@ sub form_check_form($$$) {
   $formdata=$form->{data};
 
   for $i (0..$#{$formdata}) {
-
+    
     $rec=$$formdata[$i];
     $type=$rec->{ftype};
     $tag=$rec->{tag};
@@ -305,6 +310,10 @@ sub form_check_form($$$) {
 	  $val=0;
 	}
       }
+
+      #if ($rec->{type} eq 'ip' and $rec->{ver}) {
+      #  if($rec->{ver}
+      #}
 
       $data->{$tag}=$val;
     }
@@ -396,7 +405,6 @@ sub form_check_form($$$) {
       $data->{$tag}=param($p);
     }
   }
-
   return 0;
 }
 
