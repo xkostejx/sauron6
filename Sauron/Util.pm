@@ -70,6 +70,7 @@ $VERSION = '$Id: Util.pm,v 1.25 2009/02/05 09:28:30 tjko Exp $ ';
 	     utimefmt
          is_iaid
          trim
+         dhcpduid
 	    );
 
 
@@ -728,6 +729,16 @@ sub dhcpether($) {
   return "00:00:00:00:00:00";
 }
 
+sub dhcpduid($) {
+  my ($e) = @_;
+
+  $e="\L$e";
+  if ($e =~ /[a-f0-9A-F]{4,40}/) {
+    return join (":", unpack ("(A2)*", $e));
+  }
+
+  return "00:00:00:00:00:00:00:00:00:00:00:00";
+}
 
 # custom "system" command with timeout option
 sub run_command_internal($$$$)

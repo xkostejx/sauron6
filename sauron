@@ -1682,7 +1682,8 @@ sub make_dhcp() {
 
   undef @groups;
   db_query("SELECT id,name FROM groups WHERE server=$serverid AND " .
-	   "(type=1 OR type=3) " .
+	   #"(type=1 OR type=3) " .
+	   "type=1 " .
 	   "ORDER BY name;",\@groups);
   if (@groups < 1) {
     error("no groups found for this server");
@@ -1971,8 +1972,8 @@ sub make_dhcp6() {
 
   print DHCPFILE "\n# global options\n\n";
   undef @q;
-  db_query("SELECT d.dhcp FROM dhcp_entries6 d " .
-	   "WHERE d.type=1 AND d.ref=$serverid ORDER BY d.id",\@q);
+  db_query("SELECT d.dhcp FROM dhcp_entries d " .
+	   "WHERE d.type=11 AND d.ref=$serverid ORDER BY d.id",\@q);
   for $i (0..$#q) {
       $q[$i][0].=';' unless ($q[$i][0] =~ /[;\{\}]\s*$/);
     print DHCPFILE "$q[$i][0]\n";
@@ -1981,64 +1982,63 @@ sub make_dhcp6() {
 
 
   # dynamic hosts (DHCP classes)
-#  unless ($dhcp2_mode) {
-#  print_dhcp_classes:
-#    undef @dclasses;
-#    db_query("SELECT id,name,type FROM groups " .
-#	     "WHERE server=$serverid AND (type=3 OR type=103) " .
-#	     ($opt_dhcpclass ?
-#	      " AND name=".db_encode_str($opt_dhcpclass)." " : "") .
-#	     "ORDER BY name",\@dclasses);
-#    if (@dclasses > 0) {
-#      print DHCPFILE "\n# (dynamic) classes\n\n";
-#      for $i (0..$#dclasses) {
-#	print DHCPFILE "\nclass \"$dclasses[$i][1]\" {\n";
-#	print DHCPFILE "\tmatch pick-first-value " .
-#	               "(option host-identifier option dhcp6.client-id);\n"
-#			 if ($dclasses[$i][2] == 3);
-#	undef @q;
-#	db_query("SELECT dhcp FROM dhcp_entries6 " .
-#		 "WHERE type=5 and ref=$dclasses[$i][0] ORDER BY id",\@q);
-#	for $j (0..$#q) {
-#	    $q[$j][0].=';' unless ($q[$j][0] =~ /[;\{\}]\s*$/);
-#	    print DHCPFILE "\t$q[$j][0]\n";
-#	}
-#	print DHCPFILE "}\n";
-#
-#	# subclasses
-#	if ($dclasses[$i][2]== 3) {
-#      my $lastduid;
-#	  undef @q;
-#	  db_query("SELECT h.duid,h.domain " .
-#		   "FROM zones z JOIN hosts h ON z.id=h.zone " .
-#		   " LEFT JOIN group_entries g ON h.id=g.host " .
-#		   "WHERE z.server=$serverid AND h.duid NOTNULL " .
-#		   " AND (h.grp=$dclasses[$i][0] OR g.grp=$dclasses[$i][0]) " .
-#		   "ORDER BY h.duid",\@q);
-#	  for $j (0..$#q) {
-#	    unless ($q[$j][0] =~ /^[a-f0-9A-F]{4}$/) {
-#	      #error("invalid duid for subclass: $q[$j][0]");
-#	      next;
-#	    }
-#	    next if ($q[$j][0] eq $lastduid);
-#	    print DHCPFILE "subclass \"$dclasses[$i][1]\" 1:" .
-#	                   $q[$j][0] .  ";  # $q[$j][1]\n";
-#	    $lastduid=$q[$j][0];
-#	  }
-#	}
-#
-#      }
-#      print DHCPFILE "\n";
-#    }
-#
-#    goto dhcpd_conf_done if ($opt_dhcpclass);
-#  }
-#
+  unless ($dhcp2_mode) {
+  print_dhcp_classes:
+    undef @dclasses;
+    db_query("SELECT id,name,type FROM groups " .
+	     "WHERE server=$serverid AND (type=3 OR type=103) " .
+	     ($opt_dhcpclass ?
+	      " AND name=".db_encode_str($opt_dhcpclass)." " : "") .
+	     "ORDER BY name",\@dclasses);
+    if (@dclasses > 0) {
+      print DHCPFILE "\n# (dynamic) classes\n\n";
+      for $i (0..$#dclasses) {
+	print DHCPFILE "\nclass \"$dclasses[$i][1]\" {\n";
+	#print DHCPFILE "\tmatch option dhcp6.client-id;\n"
+	#		 if ($dclasses[$i][2] == 3);
+	undef @q;
+	db_query("SELECT dhcp FROM dhcp_entries " .
+		 "WHERE type=15 and ref=$dclasses[$i][0] ORDER BY id",\@q);
+	for $j (0..$#q) {
+	    $q[$j][0].=';' unless ($q[$j][0] =~ /[;\{\}]\s*$/);
+	    print DHCPFILE "\t$q[$j][0]\n";
+	}
+	print DHCPFILE "}\n";
+
+	# subclasses
+	if ($dclasses[$i][2]== 3) {
+      my $lastduid;
+	  undef @q;
+	  db_query("SELECT h.duid,h.domain " .
+		   "FROM zones z JOIN hosts h ON z.id=h.zone " .
+		   " LEFT JOIN group_entries g ON h.id=g.host " .
+		   "WHERE z.server=$serverid AND h.duid NOTNULL " .
+		   " AND (h.grp=$dclasses[$i][0] OR g.grp=$dclasses[$i][0]) " .
+		   "ORDER BY h.duid",\@q);
+	  for $j (0..$#q) {
+	    unless ($q[$j][0] =~ /^[a-f0-9A-F]{4}$/) {
+	      error("invalid duid for subclass: $q[$j][0]");
+	      next;
+	    }
+	    next if ($q[$j][0] eq $lastduid);
+	    print DHCPFILE "subclass \"$dclasses[$i][1]\" ".  dhcpduid($q[$j][0]) .  ";  # $q[$j][1]\n";
+	    $lastduid=$q[$j][0];
+	  }
+	}
+
+      }
+      print DHCPFILE "\n";
+    }
+
+    goto dhcpd_conf_done if ($opt_dhcpclass);
+  }
+
 
   # check for dynamic IP pools
   undef @dpools;
   db_query("SELECT id,name FROM groups WHERE server=$serverid AND type=2 ".
 	   "ORDER BY name",\@dpools);
+
   if (@dpools > 0) {
     $dpools_count=@dpools;
     print STDERR "Found $dpools_count dynamic IPv6 pools\n" if ($opt_verbose);
@@ -2055,7 +2055,7 @@ sub make_dhcp6() {
     for $i (0..$#dpools) {
       undef @q;
       db_query("SELECT dhcp FROM dhcp_entries " .
-	       "WHERE type=5 AND ref=$dpools[$i][0] ORDER BY id",\@q);
+	       "WHERE type=15 AND ref=$dpools[$i][0] ORDER BY id",\@q);
       $dpools_dhcp{$i}=[];
       for $j (0..$#q) { push @{$dpools_dhcp{$i}}, $q[$j][0]; }
     }
@@ -2080,8 +2080,8 @@ sub make_dhcp6() {
     if ($net_map_mode == 1) {
       print DHCPFILE "shared-network \"$netname\" {\n";
       undef @net_dhcp;
-      db_query("SELECT d.dhcp FROM dhcp_entries6 d " .
-	       "WHERE d.type=4 AND d.ref=$nets[$i][2] ORDER BY d.id",
+      db_query("SELECT d.dhcp FROM dhcp_entries d " .
+	       "WHERE d.type=14 AND d.ref=$nets[$i][2] ORDER BY d.id",
 	       \@net_dhcp);
       for $j (0..$#net_dhcp) { 
 	  $net_dhcp[$i][0].=';' unless ($net_dhcp[$i][0] =~ /[;\{\}]\s*$/);
@@ -2094,6 +2094,7 @@ sub make_dhcp6() {
     db_query("SELECT net,id,name,vlan FROM nets " .
 	     "WHERE server=$serverid AND no_dhcp=false AND subnet=true " .
 	     "AND dummy=false AND net << '$net' AND family(net) = 6 ORDER BY net;",\@q);
+
     if (@q < 1 ) {
       error("No subnets that use DHCP found") if ($net_map_mode==1);
       push @q, [$net,$nets[$i][2],$nets[$i][1],$nets[$i][3]];
@@ -2123,8 +2124,8 @@ sub make_dhcp6() {
       $netname = 'CHAOS' if ($vlan < 1 || $netname eq '');
       print DHCPFILE "shared-network \"$netname\" {\n";
       undef @vlan_dhcp;
-      db_query("SELECT d.dhcp FROM dhcp_entries6 d " .
-	       "WHERE d.type=6 AND d.ref=$vlan ORDER BY d.id",\@vlan_dhcp);
+      db_query("SELECT d.dhcp FROM dhcp_entries d " .
+	       "WHERE d.type=16 AND d.ref=$vlan ORDER BY d.id",\@vlan_dhcp);
       for $i (0..$#vlan_dhcp) {
 	$vlan_dhcp[$i][0].=';' unless ($vlan_dhcp[$i][0] =~ /[;\{\}]\s*$/);
 	print DHCPFILE "\t$vlan_dhcp[$i][0]\n";
@@ -2145,7 +2146,7 @@ sub make_dhcp6() {
 
   undef @groups;
   db_query("SELECT id,name FROM groups WHERE server=$serverid AND " .
-	   "(type=1 OR type=3) " .
+	   "type=1 " .
 	   "ORDER BY name;",\@groups);
   if (@groups < 1) {
     error("no groups found for this server");
@@ -2166,8 +2167,8 @@ sub make_dhcp6() {
 	print DHCPFILE "group {  # $group\n";
 	undef @qqq;
 	undef @gperhost; # per host macro store
-	db_query("SELECT d.dhcp FROM dhcp_entries6 d " .
-		 "WHERE d.type=5 AND d.ref=$gid ORDER BY d.id",\@qqq);
+	db_query("SELECT d.dhcp FROM dhcp_entries d " .
+		 "WHERE d.type=15 AND d.ref=$gid ORDER BY d.id",\@qqq);
 	for $k (0..$#qqq) {
 	  $qqq[$k][0] =~ s/\\"/"/g;
 	  $qqq[$k][0].=';' unless ($qqq[$k][0] =~ /[;\{\}]\s*$/);
@@ -2184,7 +2185,7 @@ sub make_dhcp6() {
 
 	for $j (0 .. $#nets) {
 	  $net = new Net::IP($nets[$j][0]);
-      print DHCPFILE "\t# net: " .$net->ip() . "\n";
+      print DHCPFILE "\t# net: " . ip_compress_address($net->ip(), 6) . "\n";
 	  for $k (0 .. $#ghosts) {
 	    if (($ghosts[$k][6] > 0) && ($ghosts[$k][6] < $time_now_ticks)) {
 	      # error("expired host in DHCP: $ghosts[$k][3]");
@@ -2214,7 +2215,7 @@ sub make_dhcp6() {
 	      $duids{$duid}++;
 	      print DHCPFILE "\thost $host {\n";
 	      print DHCPFILE "\t\tfixed-address6 $ip;\n";
-	      print DHCPFILE "\t\thost-identifier option dhcp6.client-id $duid;\n";
+	      print DHCPFILE "\t\thost-identifier option dhcp6.client-id " . dhcpduid($duid) . ";\n";
 
 	      $dhcplst=$dhcphosth{$dhcpid};
 	      ($adomain=$host) =~ s/^[^\.]+\.//;
@@ -2264,7 +2265,7 @@ sub make_dhcp6() {
   if (@ghosts > 0 ) {
     for $j (0 .. $#nets) {
       $net=new Net::IP($nets[$j][0]);
-      print DHCPFILE "# net: " .$net->ip() . "\n";
+      print DHCPFILE "# net: " .$net->short() . "\n";
       for $k (0 .. $#ghosts) {
 	if (($ghosts[$k][6] > 0) && ($ghosts[$k][6] < $time_now_ticks)) {
 	  # error("expired host in DHCP: $ghosts[$k][3]");
@@ -2499,7 +2500,7 @@ sub print_subnets6() {
 
   db_query("SELECT ip,router FROM hosts,zones,a_entries " .
 	       "WHERE hosts.zone=zones.id AND a_entries.host=hosts.id " .
-	       "AND zones.server=$serverid AND router>0 AND family(ip) = 6" .
+	       "AND zones.server=$serverid AND router>0 AND family(ip) = 6 " .
 	       ($net_map_mode == 1 ? "AND ip << '$net' " : "") .
 	       "ORDER BY ip,router;",\@qq);
   error("No router interfaces found for net $net!") if (@qq < 1);
@@ -2523,6 +2524,7 @@ sub print_subnets6() {
     undef @qqq;
     db_query("SELECT d.dhcp FROM dhcp_entries d " .
 	     "WHERE d.type=4 AND d.ref=$dhcpid ORDER BY d.id",\@qqq);
+
     for $k (0..$#qqq) {
 	$qqq[$k][0].=';' unless ($qqq[$k][0] =~ /[;\{\}]\s*$/);
 	print DHCPFILE "\t\t$qqq[$k][0]\n";
@@ -2542,11 +2544,11 @@ sub print_subnets6() {
                 $e=$last_ip;
                 $line = "range6 " . ($b eq $e ? "$b" : "$b $e") .";";
                 if ($net_map_mode == 2) {
-                    print DHCPFILE "\t\t$line\n";
-                    #Not in pool, prepared for future;)
-                    #for $x (0..$#{$dpools_dhcp{$k}}) {
-                    #    print DHCPFILE "\t\t\t${$dpools_dhcp{$k}}[$x];\n";
-                    #}
+                    print DHCPFILE "\t\tpool6 {\n\t\t\t$line\n";
+                    for $x (0..$#{$dpools_dhcp{$k}}) {
+                        print DHCPFILE "\t\t\t${$dpools_dhcp{$k}}[$x];\n";
+                    }
+                    print DHCPFILE "\t\t}\n";
                 }
                 else {
                     push @{$lst}, $line;
@@ -2563,10 +2565,11 @@ sub print_subnets6() {
                   $e=$last_ip;
                   $line = "range6 " . ($b eq $e ? "$b" : "$b $e") .";";
                   if ($net_map_mode == 2) {
-                    print DHCPFILE "\t\t$line\n";
-                    #for $x (0..$#{$dpools_dhcp{$k}}) {
-                    #    print DHCPFILE "\t\t\t${$dpools_dhcp{$k}}[$x];\n";
-                    #}
+                    print DHCPFILE "\t\tpool6 {\n\t\t\t$line\n";
+                    for $x (0..$#{$dpools_dhcp{$k}}) {
+                        print DHCPFILE "\t\t\t${$dpools_dhcp{$k}}[$x];\n";
+                    }
+                    print DHCPFILE "\t\t}\n";
                   }
                   else {
                       push @{$lst}, $line;
@@ -2582,10 +2585,11 @@ sub print_subnets6() {
             $e=$last_ip;
             $line = "range6 " . ($b eq $e ? "$b" : "$b $e") .";";
             if ($net_map_mode == 2) {
-                print DHCPFILE "\t\t$line\n";
-                #for $x (0..$#{$dpools_dhcp{$k}}) {
-                #    print DHCPFILE "\t\t\t${$dpools_dhcp{$k}}[$x];\n";
-                #}
+                    print DHCPFILE "\t\tpool6 {\n\t\t\t$line\n";
+                    for $x (0..$#{$dpools_dhcp{$k}}) {
+                        print DHCPFILE "\t\t\t${$dpools_dhcp{$k}}[$x];\n";
+                    }
+                    print DHCPFILE "\t\t}\n";
             }
             else
             {
@@ -2596,28 +2600,6 @@ sub print_subnets6() {
       }
     }
     print DHCPFILE "\t}\n" if $net_map_mode == 2;
-}
-
-  unless ($dhcp2_mode && $net_map_mode == 0) {
-    $first_pool=1;
-    for $j (0..$#dpools) {
-      $lst=$ranges[$j];
-      next unless (@{$lst} > 0);
-      print DHCPFILE "\n\t# dynamic IP pools\n\n" if ($first_pool);
-      $first_pool=0;
-      print DHCPFILE "\tpool {  # $dpools[$j][1]\n";
-      if ($failover_mode) {
-    print DHCPFILE "\t\tfailover peer \"$failover_peer_name\";\n",
-                   "\t\tdeny dynamic bootp clients;\n";
-      }
-      for $k (0..$#{$dpools_dhcp{$j}}) {
-    print DHCPFILE "\t\t${$dpools_dhcp{$j}}[$k];\n";
-      }
-      for $k (0..$#{$lst}) {
-    print DHCPFILE "\t\t$$lst[$k]\n";
-      }
-      print DHCPFILE "\t}\n\n";
-    }
   }
 }
 
@@ -2783,7 +2765,7 @@ sub make_printcap() {
 
 $VER = sauron_version();
 
-$result=GetOptions("help|h","all|a","bind|b","dhcp|d","dhcp_v6","printer|p","mail",
+$result=GetOptions("help|h","all|a","bind|b","dhcp|d","dhcp6","printer|p","mail",
 		   "updateserial","noupdateserial","verbose","dhcp2","clean",
 		   "check","dhcpclass=s","dhcpvlans=s","tinydns|t", "ignorelocal|i");
 
@@ -2794,7 +2776,7 @@ if ($opt_help || @ARGV < 1 || $result < 1) {
       "\t--bind               generate BIND (named) configuration files\n",
       "\t--tinydns            generate DJBDNS (tinydns) configuration files\n",
       "\t--dhcp               generate DHCP (dhcpd) configuration files\n",
-      "\t--dhcp_v6            generate DHCP6 (dhcpd) configuration files\n",
+      "\t--dhcp6              generate DHCPv6 (dhcpd) configuration files\n",
       "\t--clean              cleanup expired records and vacuum database\n",
       "\t--printer            generate PRINTER (lpd) configuration files\n\n",
       "\t--updateserial       force serial update on master zones\n\n",
@@ -2813,7 +2795,7 @@ if ($opt_help || @ARGV < 1 || $result < 1) {
 $opt_verbose=($opt_verbose ? 1 : 0);
 $opt_clean=($opt_clean ? 1 : 0);
 $opt_dhcp=($opt_dhcp ? 1 : 0);
-$opt_dhcp6=($opt_dhcp_v6 ? 1 : 0);
+$opt_dhcp6=($opt_dhcp6 ? 1 : 0);
 $opt_bind=($opt_bind ? 1 : 0);
 $opt_tinydns=($opt_tinydns ? 1 : 0);
 $opt_printer=($opt_printer ? 1 : 0);
