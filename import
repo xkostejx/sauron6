@@ -646,10 +646,6 @@ my @options_custom = get_array_txt_entries("custom-options", $options_custom, ";
 my @options_global = get_array_txt_entries("global-options", $options_global, ";");
 my @options_logging = get_array_txt_entries("logging-options", $options_logging, "};");
 
-#print "OPTIONS_CUSTOM: $options_custom\n";
-#print "OPTIONS_GLOBAL: $options_global\n";
-#print "OPTIONS LOGGING: $options_logging\n";
-
 $update_ret = update_server({
             id => $serverid,
             allow_query =>\@tmp_allow_query,
@@ -960,7 +956,7 @@ for ($i=0; $i <= $#zones; $i+=1) {
     $hosttype=8 if (@{$rec->{SRV}} > 0);
 
     if ($hosttype == 2) {
-      if ($host =~ /in-addr\.arpa|ip6\.arpa/) {
+      if ($host =~ /(in-addr|ip6)\.arpa/) {
 	print STDERR "\nIGNORING reverse delegation $host in zone $zone \n",
                      " (reverse mapping stuff should be in in-arpa zone)\n";
 	delete $zonedata{$host};

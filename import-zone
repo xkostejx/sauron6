@@ -81,13 +81,17 @@ if ($opt_group) {
 }
 
 fatal("import of 'reverse' zones not supported")
-    if ($zonename =~ /\.in-addr\.arpa\.?$/);
+    if ($zonename =~ /\.(ip6|in-addr)\.arpa\.?$/);
 
 if ($zonefile) {
     process_zonefile($zonefile,$zonename,\%zonedata,0);
 } else {
     process_zonedns($zonename,\%zonedata,$opt_nameserver,1);
 }
+
+use Data::Dumper;
+print Dumper(\%zonedata);
+
 
 $c = keys %zonedata;
 print "$c hosts found in zone\n";
@@ -99,6 +103,7 @@ unless ($opt_notransaction) {
 
 
 $rec = $zonedata{$origin};
+
 fatal("No SOA record found in zone $zonename!") unless ($rec && $rec->{SOA});
 $ttl=$rec->{TTL};
 $class=$rec->{CLASS};
@@ -120,6 +125,7 @@ unless ($pzoneid > 0) {
   foreach $rtmp (@{$rec->{TXT}}) { push @{$zonehash{txt}}, [0,$rtmp,'']; }
   $zonehash{ip}=[];
   foreach $rtmp (@{$rec->{A}}) { push @{$zonehash{ip}},[0,$rtmp,'true','true']; }
+  foreach $rtmp (@{$rec->{AAAA}}) { push @{$zonehash{ip}},[0,$rtmp,'true','true']; }
 
   @soa = split(/\s+/,$rec->{SOA});
   $zonehash{serial}=$soa[2];
@@ -173,11 +179,12 @@ foreach $host (sort keys %zonedata) {
   next if ($host eq $origin);
   next if ($rec->{CNAME});
 
+  $nslist = db_build_list_str($rec->{NS});
   $host2 = remove_origin($host,$origin);
   $hosttype=0;
-  $hosttype=1 if (@{$rec->{A}} > 0);
+  $hosttype=1 if (@{$rec->{A}} > 0 || @{$rec->{AAAA}} > 0);
   $hosttype=2 if ($nslist && $host2 ne '@');
-  $hosttype=3 if ($nslist eq '' && @{$rec->{A}} < 1 && @{$rec->{MX}} > 0);
+  $hosttype=3 if ($nslist eq '' && @{$rec->{A}} < 1 && @{$rec->{AAAA}} < 1 && @{$rec->{MX}} > 0);
   $hosttype=8 if (@{$rec->{SRV}} > 0);
 
   if ($hosttype == 0) {
@@ -215,6 +222,10 @@ foreach $host (sort keys %zonedata) {
   for $k (0..$#{$rec->{A}}) {
     # print "A=",$rec->{A}->[$k],"\n";
     push @ip_l, [0,$rec->{A}->[$k],'true','true'];
+  }
+  for $k (0..$#{$rec->{AAAA}}) {
+    # print "AAAA=",$rec->{AAAA}->[$k],"\n";
+    push @ip_l, [0,$rec->{AAAA}->[$k],'true','true'];
   }
   undef $ns_l;
   for $k (0..$#{$rec->{NS}}) {
