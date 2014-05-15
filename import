@@ -186,50 +186,113 @@ if ($opt_verbose) {
 ############################################
 # parse named.conf
 
-open(NAMEDCONF,"$namedf") || fatal("cannot open named.conf ($namedf)");
-$buf='';
+my @NAMED;
 
-while (<NAMEDCONF>) {
-  chomp;
-  s/(\/\/|\#).*$//; # eat one-line comments
-  s/\/\*.*\*\///g;  # eat one-line comments
-  next if (/^\s*$/);
+sub parseNamed {
+    my($namedf, $NAMEDCONF) = @_;
 
-  # handle multi-line comments
-  if (/^(.*?)\/\*/) {
-    #print "comment begin '$1'\n";
-    $l = $1;
-    while(<NAMEDCONF>) {
+    open(NAMEDCONF,"$namedf") || fatal("cannot open named.conf ($namedf)");
+    $buf='';
+
+    while (<NAMEDCONF>) {
       chomp;
-      #print "comment end: '$_'\n";
-      if (/^.*?\*\/(.*)$/) {
-	$_ = $l . $1;
-	last;
+      s/(\/\/|\#).*$//; # eat one-line comments
+      s/\/\*.*\*\///g;  # eat one-line comments
+      next if (/^\s*$/);
+
+      # handle multi-line comments
+      if (/^(.*?)\/\*/) {
+        #print "comment begin '$1'\n";
+        $l = $1;
+        while(<NAMEDCONF>) {
+          chomp;
+          #print "comment end: '$_'\n";
+          if (/^.*?\*\/(.*)$/) {
+        $_ = $l . $1;
+        last;
+          }
+        }
       }
-    }
-  }
 
-  s/\s+/\ /g; # eat extra whitespaces
-  s/(^\s+|\s+$)//g;
+      if(/\s*include\s+\"(.*)\"/) {
+         $file = $1;
+         $file = $opt_dir . $file if $file !~ /^.*\//;
+         parseNamed($file, $NAMEDCONF);
+      }
 
-  s/{\s*/{\n/g;
-  s/;\s*/;\n/g;
-  $buf.=$_; $partial='';
-  @p=split(/\n/,$buf);
-  foreach $tmp (@p) {
-    $tmp =~ s/(^\s+|\s+$)//g;
-    $tmp =~ s/\s+\;/\;/g;
-    if ($tmp =~ /[\{\;]\s*$/) {
-      #print "'$tmp'\n";
-      push @NAMEDCONF, $tmp;
-    } else {
-      $partial=$tmp;
+      s/\s+/\ /g; # eat extra whitespaces
+      s/(^\s+|\s+$)//g;
+
+      s/{\s*/{\n/g;
+      s/;\s*/;\n/g;
+      $buf.=$_; $partial='';
+      @p=split(/\n/,$buf);
+      foreach $tmp (@p) {
+        $tmp =~ s/(^\s+|\s+$)//g;
+        $tmp =~ s/\s+\;/\;/g;
+        if ($tmp =~ /[\{\;]\s*$/) {
+          #print "'$tmp'\n";
+          push @$NAMEDCONF, $tmp;
+        } else {
+          $partial=$tmp;
+        }
+      }
+      $buf=$partial;
     }
-  }
-  $buf=$partial;
+    push @$NAMEDCONF, $partial if ($partial);
+    close(NAMEDCONF);
 }
-push @NAMEDCONF, $partial if ($partial);
-close(NAMEDCONF);
+
+parseNamed($namedf, \@NAMED);
+
+use Data::Dumper;
+print Dumper(\@NAMED);
+exit;
+
+#open(NAMEDCONF,"$namedf") || fatal("cannot open named.conf ($namedf)");
+#$buf='';
+#
+#while (<NAMEDCONF>) {
+#  chomp;
+#  s/(\/\/|\#).*$//; # eat one-line comments
+#  s/\/\*.*\*\///g;  # eat one-line comments
+#  next if (/^\s*$/);
+#
+#  # handle multi-line comments
+#  if (/^(.*?)\/\*/) {
+#    #print "comment begin '$1'\n";
+#    $l = $1;
+#    while(<NAMEDCONF>) {
+#      chomp;
+#      #print "comment end: '$_'\n";
+#      if (/^.*?\*\/(.*)$/) {
+#	$_ = $l . $1;
+#	last;
+#      }
+#    }
+#  }
+#
+#  s/\s+/\ /g; # eat extra whitespaces
+#  s/(^\s+|\s+$)//g;
+#
+#  s/{\s*/{\n/g;
+#  s/;\s*/;\n/g;
+#  $buf.=$_; $partial='';
+#  @p=split(/\n/,$buf);
+#  foreach $tmp (@p) {
+#    $tmp =~ s/(^\s+|\s+$)//g;
+#    $tmp =~ s/\s+\;/\;/g;
+#    if ($tmp =~ /[\{\;]\s*$/) {
+#      #print "'$tmp'\n";
+#      push @NAMEDCONF, $tmp;
+#    } else {
+#      $partial=$tmp;
+#    }
+#  }
+#  $buf=$partial;
+#}
+#push @NAMEDCONF, $partial if ($partial);
+#close(NAMEDCONF);
 
 
 my %acls;
