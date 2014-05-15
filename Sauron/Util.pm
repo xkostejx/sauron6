@@ -733,7 +733,7 @@ sub dhcpduid($) {
   my ($e) = @_;
 
   $e="\L$e";
-  if ($e =~ /[a-f0-9A-F]{4,40}/) {
+  if ($e =~ /[a-f0-9A-F]{1,40}/) {
     return join (":", unpack ("(A2)*", $e));
   }
 

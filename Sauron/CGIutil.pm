@@ -43,8 +43,8 @@ my($CGI_UTIL_zoneid,$CGI_UTIL_zone);
 my($CGI_UTIL_serverid,$CGI_UTIL_server);
 
 my %aml_type_hash = (0=>'CIDR',1=>'ACL',2=>'Key');
-our $inetFamily4 = undef;
-our $inetFamily6 = undef;
+our $inetFamily4 = 0;
+our $inetFamily6 = 0;
 our $inetNet = undef;
 our $formduid = undef;
 
@@ -108,6 +108,7 @@ sub form_check_field($$$) {
   my($field,$value,$n) = @_;
   my($type,$empty,$t,$tmp1,$tmp2);
 
+
   if ($n > 0) {
     $empty=${$field->{empty}}[$n-1];
     $type=${$field->{type}}[$n-1];
@@ -142,13 +143,13 @@ sub form_check_field($$$) {
     return 'valid pathname required!'
       unless ($value =~ /^(|\S+\/)$/);
   } elsif ($type =~ /ip[46]?/) {
-     my $ipversion = ip_get_version($value);
+    my $ipversion = ip_get_version($value);
      return 'IPv4 address required!' if $type eq 'ip4' and $ipversion == 6;
      return 'IPv6 address required!' if $type eq 'ip6' and $ipversion == 4;
-      
+    
       if ($inetNet eq 'MANUAL' || !$inetNet ) {
-        $inetFamily4 = ($ipversion == 4 ? 1 : 0);
-        $inetFamily6 = ($ipversion == 6 ? 1 : 0);
+        $inetFamily4 |= ($ipversion == 4 ? 1 : 0);
+        $inetFamily6 |= ($ipversion == 6 ? 1 : 0);
       }        
 
     return 'valid IP address required!' unless is_cidr($value);
@@ -183,6 +184,7 @@ sub form_check_field($$$) {
   } elsif ($type eq 'mac') { 
     return 'Ethernet address required!' if ($value !~ /^([0-9A-Fa-f]{12})$/ and $inetFamily4);
   } elsif ($type eq 'duid') {
+    
     $formduid = $value if $value !~ /^\s*$/;
     return 'Empty field not allowed! (Only if IPv6 address is entered)' if $value =~ /^\s*$/ and !$empty and ((!$inetFamily4 and !$inetFamily6) || $inetFamily6);
     return 'Empty DUID required! (IPv6 address not set)' if $value !~ /^\s*$/ and $inetFamily4 and !$inetFamily6;
@@ -310,11 +312,6 @@ sub form_check_form($$$) {
 	  $val=0;
 	}
       }
-
-      #if ($rec->{type} eq 'ip' and $rec->{ver}) {
-      #  if($rec->{ver}
-      #}
-
       $data->{$tag}=$val;
     }
     elsif ($type == 101) {
@@ -470,6 +467,7 @@ sub form_magic($$$) {
 	  for $k (1..$rec->{fields}) {
 	    $val=$$a[$j][$k];
 	    $val =~ s/\/32$// if ($rec->{type}[$k-1] eq 'ip');
+	    $val =~ s/\/128$// if ($rec->{type}[$k-1] eq 'ip');
 	    param($p1."_".$j."_".$k,$val);
 	  }
 	}
@@ -491,7 +489,7 @@ sub form_magic($$$) {
 	for $j (1..$#{$a}) {
 	  param($p1."_".$j."_id",$$a[$j][0]);
 	  $ip=$$a[$j][1];
-	  $ip =~ s/\/\d{1,2}$//g;
+	  $ip =~ s/\/\d{1,3}$//g;
 	  param($p1."_".$j."_1",$ip);
 	  $t=''; $t='on' if ($$a[$j][2] eq 't' || $$a[$j][2] == 1);
 	  param($p1."_".$j."_2",$t);
@@ -674,7 +672,9 @@ sub form_magic($$$) {
 	$n=$p2."_1";
 	print "<TD>",textfield(-name=>$n,-size=>40,-value=>param($n));
         print "<FONT size=-1 color=\"red\"><BR>",
-              form_check_field($rec,param($n),1),"</FONT></TD>";
+              #Value to be deleted won't be checked.
+              (param($p2."_del") eq 'on' ? '' : form_check_field($rec,param($n),1)),"</FONT></TD>";
+              #form_check_field($rec,param($n),1),"</FONT></TD>";
 
 	if ($rec->{restricted_mode}) {
 	  $n=$p2."_3";

@@ -805,26 +805,26 @@ sub menu_handler {
 	    }
 	  }
 	
-	  for $i (1..$#{$host{ip}}) { 
-            $useInet4 = 1 if ip_is_ipv4($host{ip}[$i][1]) and param("h_ip_".$i."_del") ne "on";
-		    $useInet6 = 1 if ip_is_ipv6($host{ip}[$i][1]) and param("h_ip_".$i."_del") ne "on";
-      }
+	  #for $i (1..$#{$host{ip}}) { 
+      #      $useInet4 = 1 if ip_is_ipv4($host{ip}[$i][1]) and param("h_ip_".$i."_del") ne "on";
+	  #      $useInet6 = 1 if ip_is_ipv6($host{ip}[$i][1]) and param("h_ip_".$i."_del") ne "on";
+      #}
 
 
-	  if($useInet6 == 0 and $host{duid} ne ""){
-	  	    alert2("IPv6 address not set -> empty DUID required!");
-            $update_ok = 0;
-	  }
+	  #if($useInet6 == 0 and $host{duid} ne ""){
+	  #	    alert2("IPv6 address not set -> empty DUID required!");
+      #      $update_ok = 0;
+	  #}
 
-      if($useInet6 == 0 and $host{iaid} ne ""){
-            alert2("IPv6 address not set -> empty IAID required!");
-            $update_ok = 0;
-      }
+      #if($useInet6 == 0 and $host{iaid} ne ""){
+      #      alert2("IPv6 address not set -> empty IAID required!");
+      #      $update_ok = 0;
+      #}
 
-      if($useInet6 == 1 and $host{iaid} ne "" and $host{duid} eq ""){
-            alert2("DUID not set -> non empty DUID required!");
-            $update_ok = 0;
-      }
+      #if($useInet6 == 1 and $host{iaid} ne "" and $host{duid} eq ""){
+      #      alert2("DUID not set -> non empty DUID required!");
+      #      $update_ok = 0;
+      #}
 
 	  if ($update_ok) {
 	    $host{ether_alias}=-1 if ($host{ether});
