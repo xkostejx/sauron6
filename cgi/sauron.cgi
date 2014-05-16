@@ -408,7 +408,7 @@ exit;
 
 # ABOUT menu
 #
-sub about_menu() {
+sub about_menu2() {
   $sub=param('sub');
 
   if ($sub eq 'copyright') {
@@ -433,7 +433,9 @@ sub about_menu() {
 	"  alt=\"Sauron\">",
         "</a><BR>Version $VER<BR>(CGI $SAURON_CGI_VER)<P>",
         "a free DNS & DHCP management system<p>",
-        "<hr noshade width=\"40%\"><b>Author:</b>",
+        "<hr noshade width=\"40%\"><b>Authors:</b>",
+        "<br>Michal Kostenec <i>&lt;kostenec\@civ.zcu.cz&gt;</i>",
+        "<br>Ales Padrta <i>&lt;apadrta\@civ.zcu.cz&gt;</i>",
         "<br>Timo Kokkonen <i>&lt;tjko\@iki.fi&gt;</i>",
         "<hr width=\"30%\"><b>Logo Design:</b>",
         "<br>Teemu Lähteenmäki <i>&lt;tola\@iki.fi&gt;</i>",

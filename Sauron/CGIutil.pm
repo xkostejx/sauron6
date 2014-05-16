@@ -869,7 +869,7 @@ sub form_magic($$$) {
 				-values=>[0,1],-labels=>{0=>' ',1=>'NOT'})),
 	          "<TD>";
 	    if ($aml_mode == 0) {
-		print textfield(-name=>$p2."_2",-size=>42,-maxlength=>42,
+		print textfield(-name=>$p2."_2",-size=>43,-maxlength=>43,
 				-value=>$aml_cidr),
 		      hidden(-name=>$p2."_3",$aml_acl),
   		      hidden(-name=>$p2."_4",$aml_key);
@@ -903,7 +903,7 @@ sub form_magic($$$) {
 	      "<TD rowspan=3 bgcolor=\"#efefef\">",
 	      popup_menu(-name=>$p2."_5",-default=>'0',
 			    -values=>[0,1],-labels=>{0=>' ',1=>'NOT'}),"</TD>",
-	      "<TD>",textfield(-name=>$p2."_2",-size=>42,-maxlength=>42,
+	      "<TD>",textfield(-name=>$p2."_2",-size=>43,-maxlength=>43,
 			   -value=>''),
 	      "</TD><TD rowspan=3 bgcolor=\"#efefef\">",
 	      textfield(-name=>$p2."_6",-size=>25,-maxlength=>80,
