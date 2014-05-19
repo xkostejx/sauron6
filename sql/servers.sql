@@ -88,6 +88,23 @@ CREATE TABLE servers (
 	df_split	INT DEFAULT 128,      /* split */
 	df_loadbalmax	INT DEFAULT 3,	      /* load balance max seconds */
 
+   /* DHCPv6 failover */
+	df_port6		INT DEFAULT 520,      /* listen port */
+	df_max_delay6	INT DEFAULT 60,	      /* max-response-delay */
+	df_max_uupdates6 INT DEFAULT 10,	      /* max-unacked-updates */
+	df_mclt6		INT DEFAULT 3600,     /* mlct */
+	df_split6	INT DEFAULT 128,      /* split */
+	df_loadbalmax6	INT DEFAULT 3,	      /* load balance max seconds */
+
+    dhcp_flags6     integer DEFAULT 0;  /* DHCP option flags:
+                                        0x01 = auto-generate domainnames
+                                        0x02 = enable failover protocol */
+
+    listen_on_port_v6 TEXT;             /* listen on port (optional) */
+    transfer_source_v6 INET;            /* transfer-source (optional) */
+    query_src_ip_v6 TEXT;               /* query source ip (optional) (ip | '*') */
+    query_src_port_v6 TEXT;             /* query source port (optional) (port | '*') */
+
 	/* defaults to use in zones */
 	hostname	TEXT,  /* primary servername for sibling zone SOAs */
 	hostaddr	INET,  /* primary server IP address */

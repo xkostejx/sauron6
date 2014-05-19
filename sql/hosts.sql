@@ -72,8 +72,13 @@ CREATE TABLE hosts (
 			       
        comment	   TEXT,       /* comment */
 
+       duid       character varying(40),    /*DUID*/
+       iaid       bigint,      /*IAID*/
+
+
        CONSTRAINT  hostname_key UNIQUE (domain,zone),
        CONSTRAINT  ether_key UNIQUE(ether,zone),
        CONSTRAINT  asset_key UNIQUE(asset_id,zone)
 ) INHERITS(common_fields);
 
+CREATE UNIQUE INDEX duid_iaid_key ON hosts USING btree (zone, duid, (COALESCE(iaid, (0)::bigint)));

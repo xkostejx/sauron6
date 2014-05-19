@@ -19,7 +19,8 @@ CREATE TABLE leases (
       state	   INT4 DEFAULT 0, /* lease state */
       uid	   TEXT, /* dhcp uid */
       hostname     TEXT, /* dhcp hostname */
-      info	   TEXT  /* extra info */
+      info	   TEXT,  /* extra info */
+      duid     character varying(40)
 );
 
 CREATE INDEX leases_mac_index ON leases (mac);
