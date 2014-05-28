@@ -1460,7 +1460,7 @@ sub add_zone($) {
   if ($rec->{reverse} =~ /^(t|true)$/) {
       $new_net=arpa2cidr($rec->{name});
       if (($new_net eq '0.0.0.0/0') or ($new_net eq '')) {
-	  return -100;
+	  return -200;
       }
       $rec->{reversenet}=$new_net;
   }

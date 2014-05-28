@@ -16,10 +16,6 @@ use Sauron::Sauron;
 use Data::Dumper;
 use Net::IP qw(:PROC);
 
-
-#print arpa2cidr("f.f.0.0.1.0.0.0.0.0.0.0.0.0.0.0.1.0.0.1.1.0.8.1.8.1.7.0.1.0.0.2.ip6.arpa."),"\n";
-#exit;
-
 load_config();
 
 # if these are not defined, then values are taken from first master zone
@@ -141,6 +137,65 @@ sub get_ip_value($$$$) {
 }
 
 
+sub parseNamed {
+    my($namedf, $NAMEDCONF) = @_;
+
+    my $NAMEDFILE;
+    open($NAMEDFILE,"$namedf") || fatal("cannot open named.conf ($namedf)");
+
+    $buf='';
+
+    while (<$NAMEDFILE>) {
+      chomp;
+      s/(\/\/|\#).*$//; # eat one-line comments
+      s/\/\*.*\*\///g;  # eat one-line comments
+      next if (/^\s*$/);
+
+      # handle multi-line comments
+      if (/^(.*?)\/\*/) {
+        #print "comment begin '$1'\n";
+        $l = $1;
+        while(<$NAMEDFILE>) {
+          chomp;
+          #print "comment end: '$_'\n";
+          if (/^.*?\*\/(.*)$/) {
+        $_ = $l . $1;
+        last;
+          }
+        }
+      }
+
+      if(/\s*include\s+\"(.*)\"/) {
+         $file = $1;
+         $file = $opt_dir . $file if $file !~ /^.*\//;
+         parseNamed($file, $NAMEDCONF);
+         next;
+      }
+      
+      s/\s+/\ /g; # eat extra whitespaces
+      s/(^\s+|\s+$)//g;
+
+      s/{\s*/{\n/g;
+      s/;\s*/;\n/g;
+      $buf.=$_; $partial='';
+      @p=split(/\n/,$buf);
+      foreach $tmp (@p) {
+        $tmp =~ s/(^\s+|\s+$)//g;
+        $tmp =~ s/\s+\;/\;/g;
+        if ($tmp =~ /[\{\;]\s*$/) {
+          #print "'$tmp'\n";
+          push @$NAMEDCONF, $tmp;
+        } else {
+          $partial=$tmp;
+        }
+      }
+      $buf=$partial;
+    }
+    push @$NAMEDCONF, $partial if ($partial);
+    close($NAMEDFILE);
+    
+}
+
 if ($opt_help || @ARGV < 2) {
     print "syntax: $0 [options] <servername> <named.conf file>\n";
     print "options:\n",
@@ -187,113 +242,7 @@ if ($opt_verbose) {
 # parse named.conf
 
 my @NAMED;
-
-sub parseNamed {
-    my($namedf, $NAMEDCONF) = @_;
-
-    open(NAMEDCONF,"$namedf") || fatal("cannot open named.conf ($namedf)");
-    $buf='';
-
-    while (<NAMEDCONF>) {
-      chomp;
-      s/(\/\/|\#).*$//; # eat one-line comments
-      s/\/\*.*\*\///g;  # eat one-line comments
-      next if (/^\s*$/);
-
-      # handle multi-line comments
-      if (/^(.*?)\/\*/) {
-        #print "comment begin '$1'\n";
-        $l = $1;
-        while(<NAMEDCONF>) {
-          chomp;
-          #print "comment end: '$_'\n";
-          if (/^.*?\*\/(.*)$/) {
-        $_ = $l . $1;
-        last;
-          }
-        }
-      }
-
-      if(/\s*include\s+\"(.*)\"/) {
-         $file = $1;
-         $file = $opt_dir . $file if $file !~ /^.*\//;
-         parseNamed($file, $NAMEDCONF);
-      }
-
-      s/\s+/\ /g; # eat extra whitespaces
-      s/(^\s+|\s+$)//g;
-
-      s/{\s*/{\n/g;
-      s/;\s*/;\n/g;
-      $buf.=$_; $partial='';
-      @p=split(/\n/,$buf);
-      foreach $tmp (@p) {
-        $tmp =~ s/(^\s+|\s+$)//g;
-        $tmp =~ s/\s+\;/\;/g;
-        if ($tmp =~ /[\{\;]\s*$/) {
-          #print "'$tmp'\n";
-          push @$NAMEDCONF, $tmp;
-        } else {
-          $partial=$tmp;
-        }
-      }
-      $buf=$partial;
-    }
-    push @$NAMEDCONF, $partial if ($partial);
-    close(NAMEDCONF);
-}
-
 parseNamed($namedf, \@NAMED);
-
-use Data::Dumper;
-print Dumper(\@NAMED);
-exit;
-
-#open(NAMEDCONF,"$namedf") || fatal("cannot open named.conf ($namedf)");
-#$buf='';
-#
-#while (<NAMEDCONF>) {
-#  chomp;
-#  s/(\/\/|\#).*$//; # eat one-line comments
-#  s/\/\*.*\*\///g;  # eat one-line comments
-#  next if (/^\s*$/);
-#
-#  # handle multi-line comments
-#  if (/^(.*?)\/\*/) {
-#    #print "comment begin '$1'\n";
-#    $l = $1;
-#    while(<NAMEDCONF>) {
-#      chomp;
-#      #print "comment end: '$_'\n";
-#      if (/^.*?\*\/(.*)$/) {
-#	$_ = $l . $1;
-#	last;
-#      }
-#    }
-#  }
-#
-#  s/\s+/\ /g; # eat extra whitespaces
-#  s/(^\s+|\s+$)//g;
-#
-#  s/{\s*/{\n/g;
-#  s/;\s*/;\n/g;
-#  $buf.=$_; $partial='';
-#  @p=split(/\n/,$buf);
-#  foreach $tmp (@p) {
-#    $tmp =~ s/(^\s+|\s+$)//g;
-#    $tmp =~ s/\s+\;/\;/g;
-#    if ($tmp =~ /[\{\;]\s*$/) {
-#      #print "'$tmp'\n";
-#      push @NAMEDCONF, $tmp;
-#    } else {
-#      $partial=$tmp;
-#    }
-#  }
-#  $buf=$partial;
-#}
-#push @NAMEDCONF, $partial if ($partial);
-#close(NAMEDCONF);
-
 
 my %acls;
 my @listen_on;
@@ -312,7 +261,8 @@ my $options_custom;
 my $options_logging;
 
 
-foreach $line (@NAMEDCONF) {
+#foreach $line (@NAMEDCONF) {
+foreach $line (@NAMED) {
   $_ = $line;
   s/\s+/\ /g;
   next if (/^\s*$/);
@@ -327,12 +277,6 @@ foreach $line (@NAMEDCONF) {
         next;
   }
 
-  #if ( /^\s*([A-Za-z\-\_]+)\s*{(.*$)/ ) {
-  #  print "begin '$1'\n";
-  #  push @block,$1;
-  #  next;
-  #}
-
   #Copy all 1:1 in logging section, hard with subsection :( 
   if ($cur =~ /^logging/) {
         push (@block_logging, $1) if ( /^\s*([A-Za-z\-\_]+.*)\s+{(.*$)/);
@@ -341,7 +285,7 @@ foreach $line (@NAMEDCONF) {
                 pop @block_logging;
             }
             else {
-                print "end '$block[$#block]'\n";
+                print "end '$block[$#block]'\n" if $opt_verbose;
                 pop @block;
                 next;
             }
@@ -353,28 +297,28 @@ foreach $line (@NAMEDCONF) {
   }
 
   if ( /^\s*zone\s+\"(.*?)\"(\s+(in|hs|hesiod|chaos))?\s*{/ ) {
-    print "begin 'zone $1'\n";
+    print "begin 'zone $1'\n" if $opt_verbose;
     push @block, "zone $1";
     push @zones, $1;
     next;
   }
 
   if ( /^\s*acl\s+(.*?)\s*{/ ) {
-    print "begin 'acl $1'\n";
+    print "begin 'acl $1'\n" if $opt_verbose;
     push @block, "acl $1";
     $acls{$1} = [];
     next;
   }
 
   if ( /^\s*listen-on port\s+(\d+?)\s*{/ ) {
-    print "begin 'listen-on port $1'\n";
+    print "begin 'listen-on port $1'\n" if $opt_verbose;
     push @block, "listen-on port";
     $listen_on_port = $1;
     next;
   }
 
   if ( /^\s*listen-on-v6 port\s+(\d+?)\s*{/ ) {
-    print "begin 'listen-on-v6 port $1'\n";
+    print "begin 'listen-on-v6 port $1'\n" if $opt_verbose;
     push @block, "listen-on-v6 port";
     $listen_on_v6_port = $1;
     next;
@@ -382,20 +326,20 @@ foreach $line (@NAMEDCONF) {
 
   
   if ( /^\s*([A-Za-z\-\_]+.*)\s+{(.*$)/ ) {
-    print "begin '$1'\n";
+    print "begin '$1'\n" if $opt_verbose;
     push @block,$1;
     next;
   }
 
   if ( /(^.*?)};/ ) {
-    print "end '$block[$#block]'\n";
+    print "end '$block[$#block]'\n" if $opt_verbose;
     pop @block;
     next;
   }
 
   $line = $_;
   $line =~ s/(^\s+|;\s*$)//g;
-  print "LINE: $line\n";			
+  print "LINE: $line\n" if $opt_verbose;			
 
  	
   if ($cur =~ "options")  {
@@ -576,7 +520,7 @@ foreach $line (@NAMEDCONF) {
        }
        
        if ($cur =~ "allow-update") {
-           print "allow-update ($curzone) line=$line\n";
+           print "allow-update ($curzone) line=$line\n" if $opt_verbose;
            $ref = $allowupdate{$curzone};
            unless ($ref) {
              $allowupdate{$curzone}=[];
@@ -587,7 +531,7 @@ foreach $line (@NAMEDCONF) {
        }
 
       if ($cur =~ "allow-transfer") {
-           print "allow-transfer ($curzone) line=$line\n";
+           print "allow-transfer ($curzone) line=$line\n" if $opt_verbose;
            $ref = $allowtransfer{$curzone};
            unless ($ref) {
              $allowtransfer{$curzone}=[];
@@ -598,7 +542,7 @@ foreach $line (@NAMEDCONF) {
        }
     
        if ($cur =~ "also-notify") {
-           print "also-notify ($curzone) line=$line\n";
+           print "also-notify ($curzone) line=$line\n" if $opt_verbose;
            $ref = $alsonotify{$curzone};
            unless ($ref) {
              $alsonotify{$curzone}=[];
@@ -609,7 +553,7 @@ foreach $line (@NAMEDCONF) {
        }
 
        if ($cur =~ "allow-query") {
-           print "allow-query ($curzone) line=$line\n";
+           print "allow-query ($curzone) line=$line\n" if $opt_verbose;
            $ref = $allowquery{$curzone};
            unless ($ref) {
              $allowquery{$curzone}=[];
@@ -621,7 +565,7 @@ foreach $line (@NAMEDCONF) {
    }
 
 
-   print "UNPROCESSED line ($cur): $_\n";
+   print "UNPROCESSED line ($cur): $_\n" if $opt_verbose;
 }
 
 
@@ -813,7 +757,12 @@ for ($i=0; $i <= $#zones; $i+=1) {
 
 
   if (($zoneid = add_zone(\%tmphash)) < 0) {
-    print "zone already exists! skipping ($zoneid)\n";
+    if($zoneid == -200) {
+        print "bad zone name! skipping ($zoneid)\n";
+    }
+    else {
+        print "zone already exists! skipping ($zoneid)\n";
+    }
     next;
   }
   print " (id=$zoneid) ";
