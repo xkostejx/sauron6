@@ -1498,12 +1498,14 @@ sub make_dhcp() {
 
   # host dhcp hash
   undef @q;
-  db_query("SELECT h.id,d.dhcp FROM hosts h,zones z,dhcp_entries d " .
+  db_query("SELECT h.id,d.dhcp,d.comment FROM hosts h,zones z,dhcp_entries d " .
 	   "WHERE z.server=$serverid AND h.zone=z.id AND d.type=3 " .
 	   " AND d.ref=h.id ORDER BY h.id,d.id",\@q);
   for $i (0..$#q) {
     $dhcphosth{$q[$i][0]}=[] unless ($dhcphosth{$q[$i][0]});
+    $dhcphosthd{$q[$i][0]}=[] unless ($dhcphosthd{$q[$i][0]});
     push @{$dhcphosth{$q[$i][0]}}, $q[$i][1];
+    push @{$dhcphosthd{$q[$i][0]}}, $q[$i][2];
   }
 
 
@@ -1511,11 +1513,16 @@ sub make_dhcp() {
 
   print DHCPFILE "\n# global options\n\n";
   undef @q;
-  db_query("SELECT d.dhcp FROM dhcp_entries d " .
+  db_query("SELECT d.dhcp, d.comment FROM dhcp_entries d " .
 	   "WHERE d.type=1 AND d.ref=$serverid ORDER BY d.id",\@q);
   for $i (0..$#q) {
       $q[$i][0].=';' unless ($q[$i][0] =~ /[;\{\}]\s*$/);
-    print DHCPFILE "$q[$i][0]\n";
+      if($q[$i][1] ne '') {
+        print DHCPFILE "$q[$i][0]\t # $q[$i][1]\n";
+      }
+      else {
+        print DHCPFILE "$q[$i][0]\n";
+      }
   }
   print DHCPFILE "\n\n";
 
@@ -1533,15 +1540,15 @@ sub make_dhcp() {
       print DHCPFILE "\n# (dynamic) classes\n\n";
       for $i (0..$#dclasses) {
 	print DHCPFILE "\nclass \"$dclasses[$i][1]\" {\n";
-	print DHCPFILE "\tmatch pick-first-value " .
-	               "(option dhcp-client-identifier, hardware);\n"
-			 if ($dclasses[$i][2] == 3);
+	#print DHCPFILE "\tmatch pick-first-value " .
+	#               "(option dhcp-client-identifier, hardware);\n"
+	#		 if ($dclasses[$i][2] == 3);
 	undef @q;
-	db_query("SELECT dhcp FROM dhcp_entries " .
+	db_query("SELECT dhcp, comment FROM dhcp_entries " .
 		 "WHERE type=5 and ref=$dclasses[$i][0] ORDER BY id",\@q);
 	for $j (0..$#q) {
 	    $q[$j][0].=';' unless ($q[$j][0] =~ /[;\{\}]\s*$/);
-	    print DHCPFILE "\t$q[$j][0]\n";
+	    print DHCPFILE "\t$q[$j][0]\t #$q[$j][1]\n";
 	}
 	print DHCPFILE "}\n";
 
@@ -1621,14 +1628,20 @@ sub make_dhcp() {
     if ($net_map_mode == 1) {
       print DHCPFILE "shared-network \"$netname\" {\n";
       undef @net_dhcp;
-      db_query("SELECT d.dhcp FROM dhcp_entries d " .
+      db_query("SELECT d.dhcp, d.comment FROM dhcp_entries d " .
 	       "WHERE d.type=4 AND d.ref=$nets[$i][2] ORDER BY d.id",
 	       \@net_dhcp);
       for $j (0..$#net_dhcp) { 
 	  $net_dhcp[$i][0].=';' unless ($net_dhcp[$i][0] =~ /[;\{\}]\s*$/);
-	  print DHCPFILE "\t$net_dhcp[$i][0]\n";
+          if($net_dhcp[$i][1] ne '') {
+            print DHCPFILE "\t$net_dhcp[$i][0]\t # $net_dhcp[$i][1]\n";
+          }
+          else {
+            print DHCPFILE "\t$net_dhcp[$i][0]\n";
+          }
       }
-      print DHCPFILE "\n";
+      
+print DHCPFILE "\n";
     }
 
     undef @q;
@@ -1663,12 +1676,17 @@ sub make_dhcp() {
       $netname = 'CHAOS' if ($vlan < 1 || $netname eq '');
       print DHCPFILE "shared-network \"$netname\" {\n";
       undef @vlan_dhcp;
-      db_query("SELECT d.dhcp FROM dhcp_entries d " .
+      db_query("SELECT d.dhcp, d.comment FROM dhcp_entries d " .
 	       "WHERE d.type=6 AND d.ref=$vlan ORDER BY d.id",\@vlan_dhcp);
       for $i (0..$#vlan_dhcp) {
 	$vlan_dhcp[$i][0].=';' unless ($vlan_dhcp[$i][0] =~ /[;\{\}]\s*$/);
-	print DHCPFILE "\t$vlan_dhcp[$i][0]\n";
-      }
+        if($vlan_dhcp[$i][1] ne '') {
+	        print DHCPFILE "\t$vlan_dhcp[$i][0]\t # $vlan_dhcp[$i][1]\n";
+        }
+        else {
+	        print DHCPFILE "\t$vlan_dhcp[$i][0]\n";
+        } 
+     }
       undef @q;
       for $i (0..$#subnets) {
 	push ( @q, $subnets[$i])  if ($subnets[$i][3] eq $vlan);
@@ -1697,8 +1715,9 @@ sub make_dhcp() {
 	     "FROM hosts h, zones z, a_entries a " .
 	     "WHERE h.zone=z.id AND a.host=h.id AND h.type=1 " .
 	     "AND h.ether NOTNULL AND z.server=$serverid " .
-	     "AND h.grp>-1 AND family(a.ip) = 4" .
+	     "AND h.grp>-1 AND family(a.ip) = 4 " .
 	     "ORDER BY a.ip;",\@ghosts);
+
     if (@ghosts > 0) {
       for $i (0.. $#groups) {
 	$gid=$groups[$i][0];
@@ -1707,9 +1726,10 @@ sub make_dhcp() {
 	print DHCPFILE "group {  # $group\n";
 	undef @qqq;
 	undef @gperhost; # per host macro store
-	db_query("SELECT d.dhcp FROM dhcp_entries d " .
+	db_query("SELECT d.dhcp, d.comment FROM dhcp_entries d " .
 		 "WHERE d.type=5 AND d.ref=$gid ORDER BY d.id",\@qqq);
-	for $k (0..$#qqq) {
+	
+    for $k (0..$#qqq) {
 	  $qqq[$k][0] =~ s/\\"/"/g;
 	  $qqq[$k][0].=';' unless ($qqq[$k][0] =~ /[;\{\}]\s*$/);
 
@@ -1718,8 +1738,12 @@ sub make_dhcp() {
 	      push(@gperhost,$qqq[$k][0]);    
 	      next;
 	  }
-
-	  print DHCPFILE "\t$qqq[$k][0]\n";
+      if($qqq[$k][1] ne '') {
+	    print DHCPFILE "\t$qqq[$k][0]\t #$qqq[$k][1]\n";
+      }
+      else {
+	    print DHCPFILE "\t$qqq[$k][0]\n";
+      }
 	}
 	print DHCPFILE "\t\n";
 
@@ -1779,9 +1803,14 @@ sub make_dhcp() {
 	      $dhcp_var{'host'}   = $host;
 
 	      for $l (0..$#{$dhcplst}) {
-		  $$dhcplst[$l].=';' unless ($$dhcplst[$l] =~ /[;\{\}]\s*$/);
-		  print DHCPFILE "\t\t" . expand_dhcp_macro($$dhcplst[$l],\%dhcp_var)."\n";
-	      }
+		    $$dhcplst[$l].=';' unless ($$dhcplst[$l] =~ /[;\{\}]\s*$/);
+		    if(@{$dhcphosthd{$dhcpid}}[$l] ne '') {
+                print DHCPFILE "\t\t" . expand_dhcp_macro($$dhcplst[$l],\%dhcp_var)."\t#" . @{$dhcphosthd{$dhcpid}}[$l] ."\n";
+	        }
+            else {
+                print DHCPFILE "\t\t" . expand_dhcp_macro($$dhcplst[$l],\%dhcp_var) . "\n";
+            }
+          }
 	      print DHCPFILE "\t}\n";
 	    }
 	  }
@@ -1843,9 +1872,15 @@ sub make_dhcp() {
 	  }
 
 	  $dhcplst=$dhcphosth{$dhcpid};
+
 	  for $l (0..$#{$dhcplst}) {
 	      $$dhcplst[$l].=';' unless ($$dhcplst[$l] =~ /[;\{\}]\s*$/);
-	      print DHCPFILE "\t$$dhcplst[$l]\n";
+	      if(@{$dhcphosthd{$dhcpid}}[$l] ne '') {
+            print DHCPFILE "\t$$dhcplst[$l]\t #". @{$dhcphosthd{$dhcpid}}[$l] . "\n";
+          }
+          else {
+            print DHCPFILE "\t$$dhcplst[$l]\n";
+          }
 	  }
 	  print DHCPFILE "}\n";
 	}
@@ -1952,7 +1987,7 @@ sub make_dhcp6() {
 	   " AND h.duid NOTNULL AND family(a.ip) = 6;",\@q);
   error(db_errormsg()) if (db_errormsg());
   for $i (0..$#q) {
-    unless ($q[$i][0] =~ /^[0-9A-Fa-f]{4}\s*$/) {
+    unless ($q[$i][0] =~ /^[0-9A-Fa-f]{4,40}\s*$/) {
       error("Invalid DUID ($q[$i][0]) skipped");
       next;
     }
@@ -1962,12 +1997,14 @@ sub make_dhcp6() {
 
   # host dhcp hash
   undef @q;
-  db_query("SELECT h.id,d.dhcp FROM hosts h,zones z,dhcp_entries d " .
-	   "WHERE z.server=$serverid AND h.zone=z.id AND d.type=3 " .
+  db_query("SELECT h.id,d.dhcp, d.comment FROM hosts h,zones z,dhcp_entries d " .
+	   "WHERE z.server=$serverid AND h.zone=z.id AND d.type=13 " .
 	   " AND d.ref=h.id ORDER BY h.id,d.id",\@q);
   for $i (0..$#q) {
     $dhcphosth{$q[$i][0]}=[] unless ($dhcphosth{$q[$i][0]});
+    $dhcphosthd{$q[$i][0]}=[] unless ($dhcphosthd{$q[$i][0]});
     push @{$dhcphosth{$q[$i][0]}}, $q[$i][1];
+    push @{$dhcphosthd{$q[$i][0]}}, $q[$i][2];
   }
 
 
@@ -1975,11 +2012,16 @@ sub make_dhcp6() {
 
   print DHCPFILE "\n# global options\n\n";
   undef @q;
-  db_query("SELECT d.dhcp FROM dhcp_entries d " .
+  db_query("SELECT d.dhcp, d.comment FROM dhcp_entries d " .
 	   "WHERE d.type=11 AND d.ref=$serverid ORDER BY d.id",\@q);
   for $i (0..$#q) {
       $q[$i][0].=';' unless ($q[$i][0] =~ /[;\{\}]\s*$/);
-    print DHCPFILE "$q[$i][0]\n";
+      if($q[$i][1] ne '') {
+        print DHCPFILE "$q[$i][0]\t# $q[$i][1]\n";
+      }
+      else {
+        print DHCPFILE "$q[$i][0]\n";
+      }
   }
   print DHCPFILE "\n\n";
 
@@ -2000,11 +2042,16 @@ sub make_dhcp6() {
 	#print DHCPFILE "\tmatch option dhcp6.client-id;\n"
 	#		 if ($dclasses[$i][2] == 3);
 	undef @q;
-	db_query("SELECT dhcp FROM dhcp_entries " .
+	db_query("SELECT dhcp, comment FROM dhcp_entries " .
 		 "WHERE type=15 and ref=$dclasses[$i][0] ORDER BY id",\@q);
 	for $j (0..$#q) {
 	    $q[$j][0].=';' unless ($q[$j][0] =~ /[;\{\}]\s*$/);
-	    print DHCPFILE "\t$q[$j][0]\n";
+	     if($q[$j][1] ne '') {
+            print DHCPFILE "\t$q[$j][0]\t #$q[$j][1]\n";
+         }
+         else {
+            print DHCPFILE "\t$q[$j][0]\n";
+         }
 	}
 	print DHCPFILE "}\n";
 
@@ -2170,8 +2217,9 @@ sub make_dhcp6() {
 	print DHCPFILE "group {  # $group\n";
 	undef @qqq;
 	undef @gperhost; # per host macro store
-	db_query("SELECT d.dhcp FROM dhcp_entries d " .
+	db_query("SELECT d.dhcp, d.comment FROM dhcp_entries d " .
 		 "WHERE d.type=15 AND d.ref=$gid ORDER BY d.id",\@qqq);
+
 	for $k (0..$#qqq) {
 	  $qqq[$k][0] =~ s/\\"/"/g;
 	  $qqq[$k][0].=';' unless ($qqq[$k][0] =~ /[;\{\}]\s*$/);
@@ -2181,9 +2229,13 @@ sub make_dhcp6() {
 	      push(@gperhost,$qqq[$k][0]);    
 	      next;
 	  }
-
-	  print DHCPFILE "\t$qqq[$k][0]\n";
-	}
+      if($qqq[$k][1] ne '') {
+	    print DHCPFILE "\t$qqq[$k][0]\t #$qqq[$k][1]\n";
+	  }
+      else {
+        print DHCPFILE "\t$qqq[$k][0]\n";
+      }
+    }
 	print DHCPFILE "\t\n";
 
 	for $j (0 .. $#nets) {
@@ -2212,8 +2264,8 @@ sub make_dhcp6() {
 	      #$dhcp=db_decode_list_str($ghosts[$k][5]);
 	      $dhcpid=$ghosts[$k][5];
 	      if ($duids{$duid}>0) {
-		error("duplicate interface $ip for $duid ($host)");
-		next;
+		    error("duplicate interface $ip for $duid ($host)");
+		    next;
 	      }
 	      $duids{$duid}++;
 	      print DHCPFILE "\thost $host {\n";
@@ -2243,8 +2295,14 @@ sub make_dhcp6() {
 
 	      for $l (0..$#{$dhcplst}) {
 		  $$dhcplst[$l].=';' unless ($$dhcplst[$l] =~ /[;\{\}]\s*$/);
-		  print DHCPFILE "\t\t" . expand_dhcp_macro($$dhcplst[$l],\%dhcp_var)."\n";
-	      }
+		  #print DHCPFILE "\t\t" . expand_dhcp_macro($$dhcplst[$l],\%dhcp_var)."\n";
+            if(@{$dhcphosthd{$dhcpid}}[$l] ne '') {
+                print DHCPFILE "\t\t" . expand_dhcp_macro($$dhcplst[$l],\%dhcp_var)."\t#" . @{$dhcphosthd{$dhcpid}}[$l] ."\n";
+            }
+            else {
+                print DHCPFILE "\t\t" . expand_dhcp_macro($$dhcplst[$l],\%dhcp_var) . "\n";
+            }
+          }
 	      print DHCPFILE "\t}\n";
 	    }
 	  }
@@ -2298,7 +2356,7 @@ sub make_dhcp6() {
 	  $duids{$duid}++;
 	  print DHCPFILE "host $host {\n";
 	  print DHCPFILE "\tfixed-address6 $ip;\n";
-	  print DHCPFILE "\thost-identifier option dhcp6.client-id $duid;\n";
+	  print DHCPFILE "\thost-identifier option dhcp6.client-id " . dhcpduid($duid) . ";\n";
 	  if ($dhcp_auto_domainnames) {
 	    ($adomain=$host) =~ s/^[^\.]+\.//;
 	    print DHCPFILE "\toption dhcp6.name-servers \"$adomain\";\n"
@@ -2306,10 +2364,16 @@ sub make_dhcp6() {
 	  }
 
 	  $dhcplst=$dhcphosth{$dhcpid};
-	  for $l (0..$#{$dhcplst}) {
+	  
+      for $l (0..$#{$dhcplst}) {
 	      $$dhcplst[$l].=';' unless ($$dhcplst[$l] =~ /[;\{\}]\s*$/);
-	      print DHCPFILE "\t$$dhcplst[$l]\n";
-	  }
+	      if(@{$dhcphosthd{$dhcpid}}[$l] ne '') {
+            print DHCPFILE "\t$$dhcplst[$l]\t #" . @{$dhcphosthd{$dhcpid}}[$l] . "\n";
+	      }
+          else {
+            print DHCPFILE "\t$$dhcplst[$l]\n";
+          }
+      }
 	  print DHCPFILE "}\n";
 	}
       }
@@ -2389,11 +2453,16 @@ sub print_subnets() {
     }
 
     undef @qqq;
-    db_query("SELECT d.dhcp FROM dhcp_entries d " .
+    db_query("SELECT d.dhcp, d.comment FROM dhcp_entries d " .
 	     "WHERE d.type=4 AND d.ref=$dhcpid ORDER BY d.id",\@qqq);
     for $k (0..$#qqq) {
 	$qqq[$k][0].=';' unless ($qqq[$k][0] =~ /[;\{\}]\s*$/);
-	print DHCPFILE "\t\t$qqq[$k][0]\n";
+	    if($qqq[$k][1] ne '') {
+            print DHCPFILE "\t\t$qqq[$k][0]\t # $qqq[$k][1]\n";
+        } 
+        else {
+            print DHCPFILE "\t\t$qqq[$k][0]\n";
+        }
     }
 
     print DHCPFILE "\t}\n" unless $net_map_mode == 2;
@@ -2526,12 +2595,18 @@ sub print_subnets6() {
     }
 
     undef @qqq;
-    db_query("SELECT d.dhcp FROM dhcp_entries d " .
+    db_query("SELECT d.dhcp, d.comment FROM dhcp_entries d " .
 	     "WHERE d.type=4 AND d.ref=$dhcpid ORDER BY d.id",\@qqq);
 
     for $k (0..$#qqq) {
 	$qqq[$k][0].=';' unless ($qqq[$k][0] =~ /[;\{\}]\s*$/);
-	print DHCPFILE "\t\t$qqq[$k][0]\n";
+        if($qqq[$k][1] ne '') {
+            print DHCPFILE "\t\t$qqq[$k][0]\t # $qqq[$k][1]\n";
+        }
+        else {
+            print DHCPFILE "\t\t$qqq[$k][0]\n";
+        }
+ 
     }
 
     print DHCPFILE "\t}\n" unless $net_map_mode == 2;
