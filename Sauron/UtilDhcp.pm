@@ -21,8 +21,8 @@ my $debug = 0;
 
 # parse dhcpd.conf file, build hash of all entries in the file
 #
-sub process_dhcpdconf($$) {
-  my ($filename,$data)=@_;
+sub process_dhcpdconf($$$) {
+  my ($filename,$data,$v6)=@_;
 
   my $fh = IO::File->new();
   my ($i,$c,$tmp,$quote,$lend,$fline,$prev,%state);
@@ -52,22 +52,22 @@ sub process_dhcpdconf($$) {
       }
       $tmp .= $c;
       if ($lend) {
-	process_line($tmp,$data,\%state);
+	process_line($tmp,$data,\%state,$v6);
 	$tmp='';
       }
     }
 
     fatal("$filename($.): unterminated quoted string!\n") if ($quote);
   }
-  process_line($tmp,$data,\%state);
+  process_line($tmp,$data,\%state,$v6);
 
   close($fh);
 
   return 0;
 }
 
-sub process_line($$$) {
-  my($line,$data,$state) = @_;
+sub process_line($$$$) {
+  my($line,$data,$state,$v6) = @_;
 
   my($tmp,$block,$rest,$ref);
 
@@ -85,7 +85,8 @@ sub process_line($$$) {
     if ($block =~ /^(group)/) {
       # generate name for groups
       $$state{groupcounter}++;
-      $rest="$1-" . $$state{groupcounter};
+      my $groupname = (!$v6 ? "group" : "group6");
+      $rest="$groupname-" . $$state{groupcounter};
     }
     elsif ($block =~ /^(pool[6]?)/) {
       $$state{poolcounter}++;

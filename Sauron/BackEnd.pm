@@ -2772,6 +2772,12 @@ sub add_net($) {
     if ($res < 0) { db_rollback(); return -3; }
   }
 
+  for $i (0..$#{$rec->{dhcp_l6}}) {
+    $res=db_exec("INSERT INTO dhcp_entries (type,ref,dhcp) " .
+		 "VALUES(4,$id,'$rec->{dhcp_l6}[$i][1]')");
+    if ($res < 0) { db_rollback(); return -4; }
+  }
+
   return -10 if (db_commit() < 0);
   return $id;
 }

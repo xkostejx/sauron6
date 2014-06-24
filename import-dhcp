@@ -26,6 +26,7 @@ GetOptions("help|h","verbose|v","dir=s","notransaction","chaosnet=s",
 if ($opt_help || @ARGV < 2) {
     print "syntax: $0 [options] <servername> <dhcpd.conf file>\n";
     print "options:\n",
+          "\t--dhcp6\t\t\timport DHCPv6 configuration\t\n",
           "\t--dir=<directory>\tdirectory where included files are located\n",
 	  "\t\t\t\t(if not in directory specified in dhcpd.conf)\n",
 	  "\t--chaosnet=<name>\ttreat this shared-network as default VLAN\n",
@@ -62,9 +63,7 @@ if ($dhcpdf =~ /(^.*\/)/) {
 
 # parse named.conf
 undef %data;
-process_dhcpdconf($dhcpdf,\%data);
-
-#print Dumper(\%data);
+process_dhcpdconf($dhcpdf,\%data,$opt_dhcp6);
 
 unless ($opt_notransaction) {
   db_begin();
@@ -78,8 +77,10 @@ if ($opt_global) {
   foreach $line (@{$data{GLOBAL}}) {
     next unless $line =~ /;\s*$/;
     $line =~ s/;\s*//;
-    print "GLOBAL: $line\n" if ($opt_verbose);
-    push @{$server{dhcp}}, [0,$line,'',2];
+    print "GLOBAL: $line\n" if ($opt_verbose && !$opt_dhcp6);
+    print "GLOBAL6: $line\n" if ($opt_verbose && $opt_dhcp6);
+    push @{$server{dhcp}}, [0,$line,'',2] if !$opt_dhcp6;
+    push @{$server{dhcp6}}, [0,$line,'',2] if $opt_dhcp6;
   }
 
   fatal("cannot update server record") if (update_server(\%server) < 0);
@@ -159,8 +160,8 @@ unless ($opt_dhcp6) {
       }
 
       print "net: $cidr ($name) (vlan id=$id)\n" if ($opt_verbose);
-      $res = add_net({server=>$serverid,netname=>$name,name=>$name,
-              net=>$cidr,subnet=>'true',vlan=>$id, dhcp_l=>\@q});
+      $res = add_net({server=>$serverid,netname=>$name,name=>$name, net=>$cidr,subnet=>'true',vlan=>$id, dhcp_l=>\@q}) if !$opt_dhcp6;
+      $res = add_net({server=>$serverid,netname=>$name,name=>$name, net=>$cidr,subnet=>'true',vlan=>$id, dhcp_l6=>\@q}) if $opt_dhcp6;
       fatal("cannot add NET ($key)") if ($res < 0);
     }
 }
@@ -308,7 +309,7 @@ foreach $key (keys %{$data{host}}) {
   $rec = $data{host}->{$key};
 
   $id=-1; $ip=''; $ether='';
-  undef @q;
+  my @q;
 
   foreach $line (@{$rec}) {
     if ($line =~ /^GROUP\s+(\S+)\s*$/) {
@@ -358,8 +359,8 @@ foreach $key (keys %{$data{host}}) {
   print "host: $key ip=$ip,ether=$ether,groupid=$id\n" if ($opt_verbose && !$opt_dhcp6);
   print "host: $key ip=$ip,duid=$ether,groupid=$id\n" if ($opt_verbose && $opt_dhcp6);
   $hosts{$ip}=[$ether,$id,$key,$sclass2class{$ether}, \@q];
-}
 
+}
 
 print "Querying database...";
 undef @list;
@@ -410,6 +411,7 @@ foreach $ip (keys %hostrefs) {
     print "Updating $domain ($ip,$id) <-- ",
           "$macs{$hosts{$ip}[0]},$hosts{$ip}[1],$hosts{$ip}[2]\n"
 	    if ($opt_verbose);
+
     $res = update_host({id=>$id,ether_alias=>$macs{$hosts{$ip}[0]}, grp=>$hosts{$ip}[1], subgroups=> \@{$hosts{$ip}[3]}, dhcp_l=>$hosts{$ip}[4]}) if !$opt_dhcp6;
     $res = update_host({id=>$id,ether_alias=>$macs{$hosts{$ip}[0]}, grp=>$hosts{$ip}[1], subgroups=> \@{$hosts{$ip}[3]}, dhcp_l6=>$hosts{$ip}[4]}) if $opt_dhcp6;
     fatal("cannot update host: $domain ($res)\n".db_errormsg()) if ($res < 0);
@@ -419,13 +421,11 @@ foreach $ip (keys %hostrefs) {
 
   print "Updating $domain ($ip,$id) <-- ",
         "$hosts{$ip}[0],$hosts{$ip}[1],$hosts{$ip}[2]\n" if ($opt_verbose);
-  if(!$opt_dhcp6) {
-    $res = update_host({id=>$id,ether=>$hosts{$ip}[0],grp=>$hosts{$ip}[1], subgroups=> \@{$hosts{$ip}[3]}, dhcp_l=>$hosts{$ip}[4]});
-  } 
-  else {
-    $res = update_host({id=>$id, duid=>$hosts{$ip}[0],grp=>$hosts{$ip}[1], subgroups=> \@{$hosts{$ip}[3]}, dhcp_l6=>$hosts{$ip}[4]});
-  }
-  fatal("cannot update host: $domain ($res)\n".db_errormsg()) if ($res < 0);
+  
+    $res = update_host({id=>$id,ether=>$hosts{$ip}[0],grp=>$hosts{$ip}[1], subgroups=> \@{$hosts{$ip}[3]}, dhcp_l=>$hosts{$ip}[4]}) if !$opt_dhcp6;
+    $res = update_host({id=>$id, duid=>$hosts{$ip}[0],grp=>$hosts{$ip}[1], subgroups=> \@{$hosts{$ip}[3]}, dhcp_l6=>$hosts{$ip}[4]}) if $opt_dhcp6;
+  
+    fatal("cannot update host: $domain ($res)\n".db_errormsg()) if ($res < 0);
 }
 
 print "Updating dynamic pools members\n";
@@ -440,7 +440,13 @@ foreach my $pool (keys %pools) {
          "WHERE z.server=$serverid AND h.zone=z.id AND h.type=1 " .
          " AND a.host=h.id AND a.ip >= inet '$pool_s' AND a.ip <= inet '$pool_e'" . 
          " ORDER BY a.ip",\@pool_members);
-    print "Found ",int(@pool_members)," hosts in range '$pool'\n" if ($opt_verbose);
+    print "Found ",int(@pool_members)," host(s) in range '$pool'\n" if ($opt_verbose);
+
+
+    my $range_size = (new Net::IP($pool))->size();
+    my $hosts_diff = $range_size - int(@pool_members);    
+
+    print "Warning: ", $hosts_diff, " DNS records for pool '$pool' not found!\n" if $hosts_diff;
 
     foreach my $m (@pool_members) {
         $id = $$m[0];
