@@ -1,5 +1,6 @@
 # Sauron::CGI::Zones.pm
 #
+# Copyright (c) Michal Kostenec <kostenec@civ.zcu.cz> 2013-2014.
 # Copyright (c) Timo Kokkonen <tjko@iki.fi>  2003.
 # $Id: Zones.pm,v 1.8 2008/02/11 08:34:27 tjko Exp $
 #

@@ -2,6 +2,7 @@
 #
 # import-dhcp - imports ISC DHCPD configuration
 #
+# Copyright (c) Michal Kostenec <kostenec@civ.zcu.cz> 2013-2014.
 # Copyright (c) Timo Kokkonen <tjko@iki.fi>  2002,2003.
 # $Id: import-dhcp,v 1.12 2003/12/28 19:29:12 tjko Exp $
 #

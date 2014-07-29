@@ -1,5 +1,6 @@
 # Sauron::UtilDhcp.pm - ISC DHCPD config file reading/parsing routines
 #
+# Copyright (c) Michal Kostenec <kostenec@civ.zcu.cz> 2013-2014.
 # Copyright (c) Timo Kokkonen <tjko@iki.fi> 2002.
 # $Id: UtilDhcp.pm,v 1.5 2003/03/05 08:14:22 tjko Exp $
 #

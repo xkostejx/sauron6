@@ -2,6 +2,7 @@
 #
 # status -- utlity to query/modify system status
 #
+# Copyright (c) Michal Kostenec <kostenec@civ.zcu.cz> 2013-2014.
 # Copyright (c) Timo Kokkonen <tjko@iki.fi>  2001-2003.
 # $Id: status,v 1.30 2008/08/25 07:02:58 tjko Exp $
 #

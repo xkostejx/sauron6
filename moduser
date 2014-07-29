@@ -2,6 +2,7 @@
 #
 # moduser - utility to modify user/group rights
 #
+# Copyright (c) Michal Kostenec <kostenec@civ.zcu.cz> 2013-2014.
 # Copyright (c) Timo Kokkonen <tjko@iki.fi>  2000-2004.
 # $Id: moduser,v 1.44 2008/03/31 08:43:31 tjko Exp $
 #

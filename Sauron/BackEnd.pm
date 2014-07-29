@@ -1,5 +1,6 @@
 # Sauron::BackEnd.pm  -- Sauron back-end routines
 #
+# Copyright (c) Michal Kostenec <kostenec@civ.zcu.cz> 2013-2014.
 # Copyright (c) Timo Kokkonen <tjko@iki.fi>  2000-2005.
 # $Id: BackEnd.pm,v 1.73 2008/03/31 08:43:32 tjko Exp $
 #

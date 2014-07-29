@@ -3,6 +3,7 @@
 # import-ethers  imports Ethernet card manufacturer codes&descriptions
 #                from text file (Ethernet.txt or IEEE's oui.txt)
 #
+# Copyright (c) Michal Kostenec <kostenec@civ.zcu.cz> 2013-2014.
 # Copyright (c) Timo Kokkonen <tjko@iki.fi>  2000-2004.
 # $Id: import-ethers,v 1.12 2004/01/03 23:59:50 tjko Exp $
 #

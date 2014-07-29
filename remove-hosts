@@ -2,6 +2,7 @@
 #
 # remove-hosts -- removes hosts based on list of MACs read from a file
 #
+# Copyright (c) Michal Kostenec <kostenec@civ.zcu.cz> 2013-2014.
 # Copyright (c) Timo Kokkonen <tjko@iki.fi>  2003.
 # $Id: remove-hosts,v 1.4 2005/04/27 06:25:28 tjko Exp $
 #
@@ -100,7 +101,7 @@ while(<FILE>) {
   }
   elsif ($opt_duid) {
     s/[\s:]//g;
-    next unless /([0-9A-Fa-f]{1,40})/;
+    next unless /([0-9A-Fa-f]{24,40})/;
     $duid=uc($1);
     db_query("SELECT h.id,h.domain FROM hosts h, zones z " .
          "WHERE z.server=$serverid AND h.zone=z.id " .

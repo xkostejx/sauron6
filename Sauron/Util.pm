@@ -1,5 +1,6 @@
 # Sauron::Util.pm
 #
+# Copyright (c) Michal Kostenec <kostenec@civ.zcu.cz> 2013-2014.
 # Copyright (c) Timo Kokkonen <tjko@iki.fi>  2000-2003,2005.
 # $Id: Util.pm,v 1.25 2009/02/05 09:28:30 tjko Exp $
 #
@@ -733,7 +734,7 @@ sub dhcpduid($) {
   my ($e) = @_;
 
   $e="\L$e";
-  if ($e =~ /[a-f0-9A-F]{1,40}/) {
+  if ($e =~ /[a-f0-9A-F]{24,40}/) {
     return join (":", unpack ("(A2)*", $e));
   }
 

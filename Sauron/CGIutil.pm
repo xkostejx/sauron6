@@ -1,5 +1,6 @@
 # Sauron::CGIutil.pm  --  generic CGI stuff
 #
+# Copyright (c) Michal Kostenec <kostenec@civ.zcu.cz> 2013-2014.
 # Copyright (c) Timo Kokkonen <tjko@iki.fi>  2001-2003,2005.
 # $Id: CGIutil.pm,v 1.20 2005/01/27 09:24:44 tjko Exp $
 #
@@ -188,7 +189,7 @@ sub form_check_field($$$) {
     $formduid = $value if $value !~ /^\s*$/;
     return 'Empty field not allowed! (Only if IPv6 address is entered)' if $value =~ /^\s*$/ and !$empty and ((!$inetFamily4 and !$inetFamily6) || $inetFamily6);
     return 'Empty DUID required! (IPv6 address not set)' if $value !~ /^\s*$/ and $inetFamily4 and !$inetFamily6;
-    return 'Valid DUID required!' if ($value !~ /^([0-9A-Fa-f]{1,40})$/ and $inetFamily6 and !$empty);
+    return 'Valid DUID required!' if ($value !~ /^([0-9A-Fa-f]{24,40})$/ and $inetFamily6 and !$empty);
   } elsif ($type eq 'iaid') {
     return 'Empty IAID required! (IPv6 address not set)' if $value !~ /^\s*$/ and !$inetFamily6;
     return 'IAID can\'t be use without DUID' if $value !~ /^\s*$/ and $inetFamily6 and !$formduid;

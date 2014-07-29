@@ -2,6 +2,7 @@
 #
 # update-hosts -- updates hosts from data in CSV format file
 #
+# Copyright (c) Michal Kostenec <kostenec@civ.zcu.cz> 2013-2014.
 # Copyright (c) Timo Kokkonen <tjko@iki.fi>  2003.
 # $Id: update-hosts,v 1.6 2003/12/28 19:29:12 tjko Exp $
 #
@@ -282,7 +283,7 @@ while(<FILE>) {
   if ($opt_duid) {
     $duid = fix_duid($l[$opt_duid-1]);
     if($ip6) { 
-        unless ($duid =~ /^[0-9A-F]{1,40}$/) {
+        unless ($duid =~ /^[0-9A-F]{24,40}$/) {
           error("$filename($.): invalid duid: $duid");
           $duid = '';
           error("$filename($.): ignoring iaid: $iaid") if $iaid ne '';

@@ -1,5 +1,6 @@
 # Sauron::CGI::Utils.pm
 #
+# Copyright (c) Michal Kostenec <kostenec@civ.zcu.cz> 2013-2014.
 # Copyright (c) Timo Kokkonen <tjko@iki.fi>  2003.
 # $Id: Utils.pm,v 1.5 2008/03/31 08:43:32 tjko Exp $
 #

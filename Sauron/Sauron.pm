@@ -1,5 +1,6 @@
 # Sauron::Sauron.pm -- configuration file parsing and default settings
 #
+# Copyright (c) Michal Kostenec <kostenec@civ.zcu.cz> 2013-2014.
 # Copyright (c) Timo Kokkonen <tjko@iki.fi>  2003-2007.
 # $Id: Sauron.pm,v 1.30 2008/02/28 08:52:47 tjko Exp $
 #

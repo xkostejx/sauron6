@@ -2,6 +2,7 @@
 #
 # export-hosts  generates list of IPs in use for given neworks
 #
+# Copyright (c) Michal Kostenec <kostenec@civ.zcu.cz> 2013-2014.
 # Copyright (c) Timo Kokkonen <tjko@iki.fi>  2004.
 # $Id: export-hosts,v 1.1 2004/08/02 05:50:13 tjko Exp $
 #

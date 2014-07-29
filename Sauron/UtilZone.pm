@@ -1,5 +1,6 @@
 # Sauron::UtilZone.pm - BIND zone file reading/parsing routines
 #
+# Copyright (c) Michal Kostenec <kostenec@civ.zcu.cz> 2013-2014.
 # Copyright (c) Timo Kokkonen <tjko@iki.fi>  2000,2002.
 # $Id: UtilZone.pm,v 1.15 2008/03/31 08:38:49 tjko Exp $
 #

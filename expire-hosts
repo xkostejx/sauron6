@@ -2,6 +2,7 @@
 #
 # expire-hosts - utility to expire hosts w/o recent dhcp activity
 #
+# Copyright (c) Michal Kostenec <kostenec@civ.zcu.cz> 2013-2014.
 # Copyright (c) Timo Kokkonen <tjko@iki.fi>  2002,2003.
 # $Id: expire-hosts,v 1.8 2006/02/23 09:43:17 tjko Exp $
 #

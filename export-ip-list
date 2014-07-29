@@ -2,6 +2,7 @@
 #
 # export-ip-list  generates list of IPs in use for given neworks
 #
+# Copyright (c) Michal Kostenec <kostenec@civ.zcu.cz> 2013-2014.
 # Copyright (c) Timo Kokkonen <tjko@iki.fi>  2004.
 # $Id: export-ip-list,v 1.4 2004/04/07 09:43:00 tjko Exp $
 #

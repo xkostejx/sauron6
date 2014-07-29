@@ -1,5 +1,6 @@
 # Sauron::CGI::Groups.pm
 #
+# Copyright (c) Michal Kostenec <kostenec@civ.zcu.cz> 2013-2014.
 # Copyright (c) Timo Kokkonen <tjko@iki.fi>  2003.
 # $Id: Groups.pm,v 1.1 2003/07/21 19:50:41 tjko Exp $
 #

@@ -2,6 +2,7 @@
 #
 # sauron - generates BIND/DHCP/printer configuration files from database
 #
+# Copyright (c) Michal Kostenec <kostenec@civ.zcu.cz> 2013-2014.
 # Copyright (c) Timo Kokkonen <tjko@iki.fi>  2000-2005.
 # $Id: sauron,v 1.105 2008/02/28 08:42:06 tjko Exp $
 #
@@ -1987,7 +1988,7 @@ sub make_dhcp6() {
 	   " AND h.duid NOTNULL AND family(a.ip) = 6;",\@q);
   error(db_errormsg()) if (db_errormsg());
   for $i (0..$#q) {
-    unless ($q[$i][0] =~ /^[0-9A-Fa-f]{4,40}\s*$/) {
+    unless ($q[$i][0] =~ /^[0-9A-Fa-f]{24,40}\s*$/) {
       error("Invalid DUID ($q[$i][0]) skipped");
       next;
     }
@@ -2066,7 +2067,7 @@ sub make_dhcp6() {
 		   " AND (h.grp=$dclasses[$i][0] OR g.grp=$dclasses[$i][0]) " .
 		   "ORDER BY h.duid",\@q);
 	  for $j (0..$#q) {
-	    unless ($q[$j][0] =~ /^[a-f0-9A-F]{4}$/) {
+	    unless ($q[$j][0] =~ /^[a-f0-9A-F]{24,40}$/) {
 	      error("invalid duid for subclass: $q[$j][0]");
 	      next;
 	    }
