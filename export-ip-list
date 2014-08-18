@@ -14,7 +14,6 @@ use Sauron::DB;
 use Sauron::Util;
 use Sauron::BackEnd;
 use Sauron::Sauron;
-use Data::Dumper;
 use Net::IP;
 
 sub optimize_ip_list($);

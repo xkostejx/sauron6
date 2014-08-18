@@ -12,8 +12,6 @@ use vars qw($VERSION @ISA @EXPORT);
 
 use Sys::Syslog qw(:DEFAULT setlogsock);
 Sys::Syslog::setlogsock('unix');
-use Data::Dumper;
-
 
 $VERSION = '$Id: DB-DBI.pm,v 1.6 2003/12/28 19:29:12 tjko Exp $ ';
 

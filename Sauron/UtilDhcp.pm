@@ -8,7 +8,6 @@ package Sauron::UtilDhcp;
 require Exporter;
 use IO::File;
 use Sauron::Util;
-use Data::Dumper;
 use strict;
 use vars qw($VERSION @ISA @EXPORT);
 
@@ -97,9 +96,7 @@ sub process_line($$$$) {
     }
     #print "begin '$block:$rest'\n";
     unshift @{$$state{BLOCKS}}, $block;
-    #print "BLOCKS: " . Dumper($$state{BLOCKS});
     unshift @{$$state{$block}}, $rest;
-    #print "BLOCK-RESTS: " . Dumper($$state{$block});
     $$data{$block}->{$rest}=[] if ($rest);
     $$state{rest}=$2;
 

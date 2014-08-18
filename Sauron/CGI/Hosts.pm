@@ -16,7 +16,6 @@ use Sauron::Sauron;
 use Sauron::CGI::Utils;
 use Sys::Syslog qw(:DEFAULT setlogsock);
 Sys::Syslog::setlogsock('unix');
-use Data::Dumper;
 use Net::IP qw(:PROC);
 use strict;
 use vars qw($VERSION @ISA @EXPORT);

@@ -11,7 +11,6 @@ use Sauron::DB;
 use Sauron::Util;
 use Sys::Syslog qw(:DEFAULT setlogsock);
 Sys::Syslog::setlogsock('unix');
-use Data::Dumper;
 use Net::IP qw (:PROC);
 
 use strict;
@@ -785,8 +784,6 @@ sub get_server($$) {
 sub update_server($) {
   my($rec) = @_;
   my($r,$id);
-
-  #print Dumper($rec);
 
   del_std_fields($rec);
   delete $rec->{dhcp_flags};

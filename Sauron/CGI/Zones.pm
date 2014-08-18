@@ -17,8 +17,6 @@ use strict;
 use vars qw($VERSION @ISA @EXPORT);
 use Sys::Syslog qw(:DEFAULT setlogsock);
 Sys::Syslog::setlogsock('unix');
-use Data::Dumper;
-
 
 $VERSION = '$Id: Zones.pm,v 1.8 2008/02/11 08:34:27 tjko Exp $ ';
 

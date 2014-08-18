@@ -18,7 +18,6 @@ use strict;
 use vars qw($VERSION @ISA @EXPORT);
 use Sys::Syslog qw(:DEFAULT setlogsock);
 Sys::Syslog::setlogsock('unix');
-use Data::Dumper;
 
 sub write2log{
   my $msg       = shift;

@@ -16,7 +16,6 @@ use Sauron::DB;
 use Sauron::BackEnd;
 use Sauron::Sauron;
 use Net::IP qw(:PROC);
-use Data::Dumper;
 load_config();
 
 $bind_conf=0;
@@ -2474,7 +2473,6 @@ sub print_subnets() {
       for $k (0..$#dpools) {
         $lst=$ranges[$k];
         $s=0;
-        #print Dumper(\@dips);
         for $l (0..$#dips) {
             if (($dips[$l][0]==$dpools[$k][0]) && $ssnet->match($dips[$l][1])) {
             #print "foo: $snet $dips[$l][1]\n";

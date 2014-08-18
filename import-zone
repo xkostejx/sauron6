@@ -90,10 +90,6 @@ if ($zonefile) {
     process_zonedns($zonename,\%zonedata,$opt_nameserver,1);
 }
 
-use Data::Dumper;
-print Dumper(\%zonedata);
-
-
 $c = keys %zonedata;
 print "$c hosts found in zone\n";
 
