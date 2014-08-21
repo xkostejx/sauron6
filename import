@@ -1142,12 +1142,11 @@ for ($i=0; $i <= $#zones; $i+=1) {
 
   }
   
-  # I'll wait with the insertion, because you might need hostid from existing record
+  # I'll wait with the insertion, because you might need hostid of existing record
   #fatal("cannot insert A or AAAA records")
   #  if (db_insert('a_entries','host,ip,reverse,forward',\@ilist) < 0);
 
   # add PTR withnout A or AAAA entry
-
     foreach $ip (keys %ipworld) {
         for $j (0..$#{$ipworld{$ip}}) {
             $host = $ipworld{$ip}->[$j];
@@ -1160,9 +1159,10 @@ for ($i=0; $i <= $#zones; $i+=1) {
                         push @ilist, [$hostid,$ip, 'true','false'];
                     }
                     else {
-                        $res=add_host({zone=>$zonesid{$re},type=>1,domain=>remove_origin($host, $1),ip=>[[0,$ip,'true','false']]});
+                        $$res=add_host({zone=>$zonesid{$re},type=>1,domain=>lc($host),ip=>[[0,$ip,'true','false']]});
                         fatal("cannot add host record for ($host)") if ($res < 0);
                     }
+                    delete $ipworld{$ip}->[$j];
                     next;
                 }
             }
@@ -1249,5 +1249,5 @@ unless ($opt_notransaction) {
 #print STDERR "Vacuuming...";
 #db_vacuum();
 print STDERR "\n";
-
+print "Import successfully completed!\n";
 # eof
