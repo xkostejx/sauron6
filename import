@@ -794,7 +794,6 @@ for ($i=0; $i <= $#zones; $i+=1) {
   process_zonefile($files{$zones[$i]},$zone,\%zonedata,0);
   print " found " . keys(%zonedata) . " domainames in zone\n";
   
-
   $rec = $zonedata{$origin};
 
   fatal("No SOA record found in zone $zone! ($origin)")

@@ -191,7 +191,7 @@ sub process_zonefile($$$$) {
     elsif ($type eq 'AAAA') {
       fatal("$filename($.): invalid AAAA record: $fline")
 	unless (ip_is_ipv6($_));
-      push @{$rec->{AAAA}}, lc($_);
+      push @{$rec->{AAAA}}, ip_compress_address(lc($_), 6);
     }
     elsif ($type eq 'SOA') {
       fatal("$filename($.): duplicate SOA record: $fline")
