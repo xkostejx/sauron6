@@ -211,7 +211,7 @@ sub process_zonefile($$$$) {
       $rec->{SOA} = join(" ",@line);
     }
     elsif ($type eq 'PTR') {
-      push @{$rec->{PTR}}, $line[0];
+      push @{$rec->{PTR}}, lc($line[0]);
     }
     elsif ($type eq 'CNAME') {
       $rec->{CNAME} = add_origin($line[0],$origin);

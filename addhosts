@@ -104,12 +104,10 @@ foreach $domain (sort keys %zonedata) {
   }
 
   undef @q;
-  db_query("SELECT id FROM hosts WHERE zone=$zoneid AND domain = '$host';",
-	   \@q);
+  db_query("SELECT id FROM hosts WHERE zone=$zoneid AND domain = '$host';", \@q);
   if (($id=$q[0][0]) > 0) {
     if ($opt_newonly) {
-      print "host: $host  SKIPPED: already exists (id=$id)\n"
-	if ($opt_verbose);
+      print "host: $host  SKIPPED: already exists (id=$id)\n" if ($opt_verbose);
       next;
     }
     print "host: $host  replacing (id=$id)\n";

@@ -793,7 +793,9 @@ for ($i=0; $i <= $#zones; $i+=1) {
 
   process_zonefile($files{$zones[$i]},$zone,\%zonedata,0);
   print " found " . keys(%zonedata) . " domainames in zone\n";
-  
+ 
+
+ 
   $rec = $zonedata{$origin};
 
   fatal("No SOA record found in zone $zone! ($origin)")
@@ -1086,8 +1088,7 @@ for ($i=0; $i <= $#zones; $i+=1) {
 		  \@ilist) < 0);
 
 
-  # add A records in a_entries
-
+  # add A and AAAA records in a_entries
   print STDERR "+";
   undef @ilist;
   foreach $host (keys %zonedata) {
@@ -1119,6 +1120,7 @@ for ($i=0; $i <= $#zones; $i+=1) {
         }
 	}
       }
+      
       push @ilist, [$hostid,$ip,$reverse,'true'];
     }
 
@@ -1135,6 +1137,7 @@ for ($i=0; $i <= $#zones; $i+=1) {
 	    }
     }
       }
+      
       push @ilist, [$hostid,$ip,$reverse,'true'];
     }
 
@@ -1148,7 +1151,7 @@ for ($i=0; $i <= $#zones; $i+=1) {
   # add PTR withnout A or AAAA entry
     foreach $ip (keys %ipworld) {
         for $j (0..$#{$ipworld{$ip}}) {
-            $host = $ipworld{$ip}->[$j];
+            $host = lc($ipworld{$ip}->[$j]);
             #Longest match fist
             foreach my $re (reverse sort {length($a) <=> length($b)} keys %zonesid)
             {
@@ -1158,7 +1161,7 @@ for ($i=0; $i <= $#zones; $i+=1) {
                         push @ilist, [$hostid,$ip, 'true','false'];
                     }
                     else {
-                        $$res=add_host({zone=>$zonesid{$re},type=>1,domain=>lc($host),ip=>[[0,$ip,'true','false']]});
+                        $$res=add_host({zone=>$zonesid{$re},type=>1,domain=>remove_origin($host, $1),ip=>[[0,$ip,'true','false']]});
                         fatal("cannot add host record for ($host)") if ($res < 0);
                     }
                     delete $ipworld{$ip}->[$j];
