@@ -439,13 +439,14 @@ foreach my $pool (keys %pools) {
          "WHERE z.server=$serverid AND h.zone=z.id AND h.type=1 " .
          " AND a.host=h.id AND a.ip >= inet '$pool_s' AND a.ip <= inet '$pool_e'" . 
          " ORDER BY a.ip",\@pool_members);
-    print "Found ",int(@pool_members)," host(s) in range '$pool'\n" if ($opt_verbose);
 
+    print "Found ",int(@pool_members)," host(s) in range '$pool'\n" if ($opt_verbose);
 
     my $range_size = (new Net::IP($pool))->size();
     my $hosts_diff = $range_size - int(@pool_members);    
 
-    print "Warning: ", $hosts_diff, " DNS records for pool '$pool' not found!\n" if $hosts_diff;
+    print "Warning: ", $hosts_diff, " DNS records for pool '$pool' not found!\n" if $hosts_diff > 0;
+    print "Warning: Found more DNS records than size of the pool '$pool'. Possible duplicates in different zones!\n" if $hosts_diff < 0;
 
     foreach my $m (@pool_members) {
         $id = $$m[0];
