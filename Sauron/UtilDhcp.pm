@@ -81,6 +81,7 @@ sub process_line($$$$) {
     $block=lc($1);
     #print "BLOCK: $block\n";
     ($rest=$2) =~ s/^\s+|\s+$//g;
+    $rest =~ s/\"//g;
     #print "REST: $rest\n";
     if ($block =~ /^(group)/) {
       # generate name for groups
@@ -132,7 +133,7 @@ sub process_line($$$$) {
 
   if ($block eq 'GLOBAL') {
     #if($line =~ /subclass\s+\"(.*)\"\s+(.*)/) {
-    if($line =~ /subclass\s+(.*)\s+(.*)/) {
+    if($line =~ /subclass\s+\"(.*)\"\s+(.*)/) {
         push @{$$data{'subclass'}->{$1}}, $2; 
     }
     else {

@@ -1536,11 +1536,21 @@ sub make_dhcp() {
 	     ($opt_dhcpclass ?
 	      " AND name=".db_encode_str($opt_dhcpclass)." " : "") .
 	     "ORDER BY name",\@dclasses);
+
     if (@dclasses > 0) {
       print DHCPFILE "\n# (dynamic) classes\n\n";
       for $i (0..$#dclasses) {
-	print DHCPFILE "\nclass \"$dclasses[$i][1]\" {\n";
-	print "CLASS:$dclasses[$i][1]|REF:$dclasses[$i][0]\n";
+	 undef @qq;
+     db_query("SELECT h.ether,h.domain " .
+		   "FROM zones z JOIN hosts h ON z.id=h.zone " .
+		   " LEFT JOIN group_entries g ON h.id=g.host " .
+		   "WHERE z.server=$serverid AND h.ether NOTNULL " .
+		   " AND (h.grp=$dclasses[$i][0] OR g.grp=$dclasses[$i][0]) " .
+		   "ORDER BY h.ether",\@qq);
+
+     next unless(@qq); 
+    
+    print DHCPFILE "\nclass \"$dclasses[$i][1]\" {\n";
 	undef @q;
 	db_query("SELECT dhcp, comment FROM dhcp_entries " .
 		 "WHERE type=5 and ref=$dclasses[$i][0] ORDER BY id",\@q);
@@ -1548,27 +1558,20 @@ sub make_dhcp() {
 	    $q[$j][0].=';' unless ($q[$j][0] =~ /[;\{\}]\s*$/);
 	    print DHCPFILE "\t$q[$j][0]\t #$q[$j][1]\n";
 	}
-	print DHCPFILE "}\n";
+	print DHCPFILE "}\n\n";
 
 	# subclasses
 	if ($dclasses[$i][2]== 3) {
 	  my $lastmac;
-	  undef @q;
-	  db_query("SELECT h.ether,h.domain " .
-		   "FROM zones z JOIN hosts h ON z.id=h.zone " .
-		   " LEFT JOIN group_entries g ON h.id=g.host " .
-		   "WHERE z.server=$serverid AND h.ether NOTNULL " .
-		   " AND (h.grp=$dclasses[$i][0] OR g.grp=$dclasses[$i][0]) " .
-		   "ORDER BY h.ether",\@q);
-	  for $j (0..$#q) {
-	    unless ($q[$j][0] =~ /^[0-9A-F]{12}$/) {
+	  for $j (0..$#qq) {
+	    unless ($qq[$j][0] =~ /^[0-9A-F]{12}$/) {
 	      #error("invalid ether for subclass: $q[$j][0]");
 	      next;
 	    }
-	    next if ($q[$j][0] eq $lastmac);
+	    next if ($qq[$j][0] eq $lastmac);
 	    print DHCPFILE "subclass \"$dclasses[$i][1]\" 1:" .
-	                   dhcpether($q[$j][0]) . ";  # $q[$j][1]\n";
-	    $lastmac=$q[$j][0];
+	                   dhcpether($qq[$j][0]) . ";  # $qq[$j][1]\n";
+	    $lastmac=$qq[$j][0];
 	  }
 	}
 
@@ -2038,10 +2041,18 @@ sub make_dhcp6() {
     if (@dclasses > 0) {
       print DHCPFILE "\n# (dynamic) classes\n\n";
       for $i (0..$#dclasses) {
+      undef @qq;
+      db_query("SELECT h.duid,h.domain " .
+           "FROM zones z JOIN hosts h ON z.id=h.zone " .
+           " LEFT JOIN group_entries g ON h.id=g.host " .
+           "WHERE z.server=$serverid AND h.duid NOTNULL " .
+           " AND (h.grp=$dclasses[$i][0] OR g.grp=$dclasses[$i][0]) " .
+           "ORDER BY h.duid",\@qq);
+
+    next unless(@qq);
+
 	print DHCPFILE "\nclass \"$dclasses[$i][1]\" {\n";
-	#print DHCPFILE "\tmatch option dhcp6.client-id;\n"
-	#		 if ($dclasses[$i][2] == 3);
-	undef @q;
+    undef @q;
 	db_query("SELECT dhcp, comment FROM dhcp_entries " .
 		 "WHERE type=15 and ref=$dclasses[$i][0] ORDER BY id",\@q);
 	for $j (0..$#q) {
@@ -2053,26 +2064,19 @@ sub make_dhcp6() {
             print DHCPFILE "\t$q[$j][0]\n";
          }
 	}
-	print DHCPFILE "}\n";
+	print DHCPFILE "}\n\n";
 
 	# subclasses
 	if ($dclasses[$i][2]== 3) {
       my $lastduid;
-	  undef @q;
-	  db_query("SELECT h.duid,h.domain " .
-		   "FROM zones z JOIN hosts h ON z.id=h.zone " .
-		   " LEFT JOIN group_entries g ON h.id=g.host " .
-		   "WHERE z.server=$serverid AND h.duid NOTNULL " .
-		   " AND (h.grp=$dclasses[$i][0] OR g.grp=$dclasses[$i][0]) " .
-		   "ORDER BY h.duid",\@q);
-	  for $j (0..$#q) {
-	    unless ($q[$j][0] =~ /^[a-f0-9A-F]{24,40}$/) {
-	      error("invalid duid for subclass: $q[$j][0]");
+      for $j (0..$#qq) {
+	    unless ($qq[$j][0] =~ /^[a-f0-9A-F]{24,40}$/) {
+	      error("invalid duid for subclass: $qq[$j][0]");
 	      next;
 	    }
-	    next if ($q[$j][0] eq $lastduid);
-	    print DHCPFILE "subclass \"$dclasses[$i][1]\" ".  dhcpduid($q[$j][0]) .  ";  # $q[$j][1]\n";
-	    $lastduid=$q[$j][0];
+	    next if ($qq[$j][0] eq $lastduid);
+	    print DHCPFILE "subclass \"$dclasses[$i][1]\" ".  dhcpduid($qq[$j][0]) .  ";  # $qq[$j][1]\n";
+	    $lastduid=$qq[$j][0];
 	  }
 	}
 
