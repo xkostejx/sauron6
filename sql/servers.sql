@@ -96,14 +96,14 @@ CREATE TABLE servers (
 	df_split6	INT DEFAULT 128,      /* split */
 	df_loadbalmax6	INT DEFAULT 3,	      /* load balance max seconds */
 
-    dhcp_flags6     integer DEFAULT 0;  /* DHCP option flags:
+    dhcp_flags6     integer DEFAULT 0,  /* DHCP option flags:
                                         0x01 = auto-generate domainnames
                                         0x02 = enable failover protocol */
 
-    listen_on_port_v6 TEXT;             /* listen on port (optional) */
-    transfer_source_v6 INET;            /* transfer-source (optional) */
-    query_src_ip_v6 TEXT;               /* query source ip (optional) (ip | '*') */
-    query_src_port_v6 TEXT;             /* query source port (optional) (port | '*') */
+    listen_on_port_v6 TEXT,             /* listen on port (optional) */
+    transfer_source_v6 INET,            /* transfer-source (optional) */
+    query_src_ip_v6 TEXT,               /* query source ip (optional) (ip | '*') */
+    query_src_port_v6 TEXT,             /* query source port (optional) (port | '*') */
 
 	/* defaults to use in zones */
 	hostname	TEXT,  /* primary servername for sibling zone SOAs */

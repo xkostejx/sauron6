@@ -1120,7 +1120,7 @@ for ($i=0; $i <= $#zones; $i+=1) {
         }
 	}
       }
-      
+     
       push @ilist, [$hostid,$ip,$reverse,'true'];
     }
 
@@ -1161,8 +1161,9 @@ for ($i=0; $i <= $#zones; $i+=1) {
                         push @ilist, [$hostid,$ip, 'true','false'];
                     }
                     else {
-                        $$res=add_host({zone=>$zonesid{$re},type=>1,domain=>remove_origin($host, $1),ip=>[[0,$ip,'true','false']]});
+                        $res=add_host({zone=>$zonesid{$re},type=>1,domain=>remove_origin($host, $1),ip=>[[0,$ip,'true','false']]});
                         fatal("cannot add host record for ($host)") if ($res < 0);
+                        $zonedata{$host}->{ID} = $res;
                     }
                     delete $ipworld{$ip}->[$j];
                     next;

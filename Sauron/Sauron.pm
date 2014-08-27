@@ -28,7 +28,7 @@ $CONF_FILE_PATH = '/usr/local/etc/sauron';
 
 
 sub sauron_version() {
-  return "0.7.3"; # current Sauron version
+  return "0.7.4"; # current Sauron version
 }
 
 
