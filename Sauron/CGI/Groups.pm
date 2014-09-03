@@ -173,7 +173,7 @@ sub menu_handler {
     print p,"$q[0][0] host records use this group.",
 	      startform(-method=>'GET',-action=>$selfurl);
     if ($q[0][0] > 0) {
-      get_group_list($serverid,\%lsth,\@lst,$perms->{alevel});
+      get_group_list($serverid,\%lsth,\@lst,$perms->{alevel},undef);
       print p,"Change those host records to point to: ",
 	        popup_menu(-name=>'grp_new',-values=>\@lst,
 			   -default=>-1,-labels=>\%lsth);

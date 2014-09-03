@@ -2520,8 +2520,8 @@ sub delete_group($) {
   return db_commit();
 }
 
-sub get_group_list($$$$) {
-  my($serverid,$rec,$lst,$alevel) = @_;
+sub get_group_list($$$$$) {
+  my($serverid,$rec,$lst,$alevel,$gtype) = @_;
   my(@q,$i);
 
   undef @{$lst};
@@ -2531,8 +2531,10 @@ sub get_group_list($$$$) {
   return unless ($serverid > 0);
   $alevel=0 unless ($alevel > 0);
 
+  my $gtypestr = ($gtype ? "type IN (" . join(",", @$gtype) . ")" : "type < 100");
+
   db_query("SELECT id,name FROM groups " .
-	   "WHERE server=$serverid AND alevel <= $alevel AND type < 100 " .
+	   "WHERE server=$serverid AND alevel <= $alevel AND $gtypestr " .
 	   "ORDER BY name;",\@q);
   for $i (0..$#q) {
     push @{$lst}, $q[$i][0];

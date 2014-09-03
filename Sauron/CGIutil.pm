@@ -775,7 +775,7 @@ sub form_magic($$$) {
     elsif ($rec->{ftype} == 9) {
       # do nothing...
     } elsif ($rec->{ftype} == 10) {
-      get_group_list($CGI_UTIL_serverid,\%lsth,\@lst,$form->{alevel});
+      get_group_list($CGI_UTIL_serverid,\%lsth,\@lst,$form->{alevel},[1,2]);
       get_group(param($p1),\%tmpl_rec);
       print td($rec->{name}),"<TD>",
 	    popup_menu(-name=>$p1,-values=>\@lst,
@@ -783,7 +783,7 @@ sub form_magic($$$) {
             "</TD>";
     }
     elsif ($rec->{ftype} == 11) {
-      get_group_list($CGI_UTIL_serverid,\%lsth,\@lst,$form->{alevel});
+      get_group_list($CGI_UTIL_serverid,\%lsth,\@lst,$form->{alevel},[3]);
       $a=(param($p1."_count") > 0 ? param($p1."_count") : 0);
 
       if (param($p1."_add")) {
