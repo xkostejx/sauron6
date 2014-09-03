@@ -105,6 +105,8 @@ if ($opt_setgroup) {
     }
     else {
         fatal("cannot find group '$opt_setgroup'") if (($gid=get_group_by_name($serverid,$opt_setgroup)) < 0);
+        fatal("cannot get group type for '$opt_setgroup'") if (($gtype = get_group_type_by_name($serverid,$opt_setgroup)) < 0);
+        fatal("cannot assign group with type 'DHCP Class' ($opt_setgroup)") if $gtype == 3;
     }
 }
 

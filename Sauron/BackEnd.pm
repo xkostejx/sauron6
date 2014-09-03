@@ -87,6 +87,7 @@ $VERSION = '$Id: BackEnd.pm,v 1.73 2008/03/31 08:43:32 tjko Exp $ ';
 	     delete_hinfo_template
 
 	     get_group_by_name
+         get_group_type_by_name
 	     get_group
 	     update_group
 	     add_group
@@ -2414,6 +2415,16 @@ sub get_group_by_name($$) {
   return -1 unless ($serverid > 0);
   $name=db_encode_str($name);
   db_query("SELECT id FROM groups WHERE server=$serverid AND name=$name",\@q);
+  return -2 unless (@q > 0);
+  return ($q[0][0]);
+}
+
+sub get_group_type_by_name($$) {
+  my($serverid,$name)=@_;
+  my(@q);
+  return -1 unless ($serverid > 0);
+  $name=db_encode_str($name);
+  db_query("SELECT type FROM groups WHERE server=$serverid AND name=$name",\@q);
   return -2 unless (@q > 0);
   return ($q[0][0]);
 }
