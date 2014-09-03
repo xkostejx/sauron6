@@ -1544,11 +1544,12 @@ sub make_dhcp() {
       for $i (0..$#dclasses) {
 	 undef @qq;
      db_query("SELECT h.ether,h.domain " .
-		   "FROM zones z JOIN hosts h ON z.id=h.zone " .
+		   " FROM zones z JOIN hosts h ON z.id=h.zone " .
 		   " LEFT JOIN group_entries g ON h.id=g.host " .
-		   "WHERE z.server=$serverid AND h.ether NOTNULL " .
+		   " WHERE z.server=$serverid AND h.ether NOTNULL " .
 		   " AND (h.grp=$dclasses[$i][0] OR g.grp=$dclasses[$i][0]) " .
-		   "ORDER BY h.ether",\@qq);
+           " AND (h.expiration > EXTRACT(epoch FROM current_timestamp) OR h.expiration = 0 OR h.expiration ISNULL) " .
+		   " ORDER BY h.ether",\@qq);
 
      next unless(@qq); 
     
@@ -1728,13 +1729,19 @@ print DHCPFILE "\n";
 	$gid=$groups[$i][0];
 	$group=$groups[$i][1];
 	# $dhcp=db_decode_list_str($groups[$i][2]);
-	undef @qqq;
+    undef @qqq;
 	undef @gperhost; # per host macro store
+	undef @qcount;
+    
+    db_query("SELECT COUNT(h.id) " .
+             "FROM hosts h, a_entries a " .
+             "WHERE a.host=h.id AND grp = $gid AND family(a.ip) = 4 AND ether IS NOT NULL",\@qcount);
+    next unless $qcount[0][0];
+
 	db_query("SELECT d.dhcp, d.comment FROM dhcp_entries d " .
 		 "WHERE d.type=5 AND d.ref=$gid ORDER BY d.id",\@qqq);
 	
-	next unless @qqq;;
-        print DHCPFILE "group {  # $group\n";
+      print DHCPFILE "group {  # $group\n";
     
       for $k (0..$#qqq) {
 	  $qqq[$k][0] =~ s/\\"/"/g;
@@ -1759,7 +1766,7 @@ print DHCPFILE "\n";
 	  print DHCPFILE "\t# net: " .$net->desc() . "\n";
 	  for $k (0 .. $#ghosts) {
 	    if (($ghosts[$k][6] > 0) && ($ghosts[$k][6] < $time_now_ticks)) {
-	      # error("expired host in DHCP: $ghosts[$k][3]");
+	      #error("expired host in DHCP: $ghosts[$k][3]");
 	      next;
 	    }
 	    $iplst=$etherhash{$ghosts[$k][1]};
@@ -2051,11 +2058,12 @@ sub make_dhcp6() {
       for $i (0..$#dclasses) {
       undef @qq;
       db_query("SELECT h.duid,h.domain " .
-           "FROM zones z JOIN hosts h ON z.id=h.zone " .
+           " FROM zones z JOIN hosts h ON z.id=h.zone " .
            " LEFT JOIN group_entries g ON h.id=g.host " .
-           "WHERE z.server=$serverid AND h.duid NOTNULL " .
+           " WHERE z.server=$serverid AND h.duid NOTNULL " .
            " AND (h.grp=$dclasses[$i][0] OR g.grp=$dclasses[$i][0]) " .
-           "ORDER BY h.duid",\@qq);
+           " AND (h.expiration > EXTRACT(epoch FROM current_timestamp) OR h.expiration = 0 OR h.expiration ISNULL) " .
+           " ORDER BY h.duid",\@qq);
 
     next unless(@qq);
 
@@ -2230,10 +2238,16 @@ sub make_dhcp6() {
 	# $dhcp=db_decode_list_str($groups[$i][2]);
 	undef @qqq;
 	undef @gperhost; # per host macro store
+    undef @qcount;
+    
+    db_query("SELECT COUNT(h.id) " .
+             "FROM hosts h, a_entries a " .
+             "WHERE a.host=h.id AND grp = $gid AND family(a.ip) = 6 AND duid IS NOT NULL",\@qcount);
+    next unless $qcount[0][0];
+
 	db_query("SELECT d.dhcp, d.comment FROM dhcp_entries d " .
 		 "WHERE d.type=15 AND d.ref=$gid ORDER BY d.id",\@qqq);
 
-	next unless @qqq;
 	print DHCPFILE "group {  # $group\n";
 
 	for $k (0..$#qqq) {
