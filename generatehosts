@@ -89,7 +89,7 @@ if ($opt_help || @ARGV < 5) {
 	"\t:IP1:\t\tfifth hextet of current IP-number\n",
 	"\t:IP2:\t\tsixth hextet of current IP-number\n",
 	"\t:IP3:\t\tseventh hextet of current IP-number\n",
-	"\t:IP4:\t\tninth hextet of current IP-number\n",
+	"\t:IP4:\t\teighth hextet of current IP-number\n",
 	"\t:N:\t\tsequence number\n",
 	"\n";
 
