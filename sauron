@@ -2420,16 +2420,16 @@ sub make_dhcp6() {
   close(DHCPFILE);
 
   # if --check specified, validate dhcpd.conf
-  if ($opt_check && $SAURON_DHCP_CHK_PROG) {
+  if ($opt_check && $SAURON_DHCP6_CHK_PROG) {
     print "Validating $dhcpd_conf_filename...\n" if ($opt_verbose);
-    fatal("cannot run SAURON_DHCP_CHK_PROG: $SAURON_DHCP_CHK_PROG")
-      unless (-x $SAURON_DHCP_CHK_PROG);
+    fatal("cannot run SAURON_DHCP6_CHK_PROG: $SAURON_DHCP6_CHK_PROG")
+      unless (-x $SAURON_DHCP6_CHK_PROG);
 
-    @args = split(/\s+/,$SAURON_DHCP_CHK_ARGS);
+    @args = split(/\s+/,$SAURON_DHCP6_CHK_ARGS);
     push @args, "$dhcpd_conf_filename" . $tmp_extension;
-    print "run: $SAURON_DHCP_CHK_PROG " .join(' ',@args)."\n" 
+    print "run: $SAURON_DHCP6_CHK_PROG " .join(' ',@args)."\n" 
 	if ($opt_verbose);
-    $res = system($SAURON_DHCP_CHK_PROG,@args);
+    $res = system($SAURON_DHCP6_CHK_PROG,@args);
     fatal("$dhcpd_conf_filename validity check failed ($res)") if ($res);
   }
 
@@ -2943,12 +2943,16 @@ fatal("--check option used but SAURON_ZONE_CHK_PROG not configured!")
   if ($opt_check && $bind_conf && ! $SAURON_ZONE_CHK_PROG);
 fatal("--check option used but SAURON_DHCP_CHK_PROG not configured!")
   if ($opt_check && $dhcp_conf && ! $SAURON_DHCP_CHK_PROG);
+fatal("--check option used but SAURON_DHCP6_CHK_PROG not configured!")
+  if ($opt_check && $dhcp_conf6 && ! $SAURON_DHCP6_CHK_PROG);
 fatal("cannot find/execute SAURON_NAMED_CHK_PROG: $SAURON_NAMED_CHK_PROG")
   if ($opt_check && $bind_conf && ! -x $SAURON_NAMED_CHK_PROG);
 fatal("cannot find/execute SAURON_ZONE_CHK_PROG: $SAURON_ZONE_CHK_PROG")
   if ($opt_check && $bind_conf && ! -x $SAURON_ZONE_CHK_PROG);
 fatal("cannot find/execute SAURON_DHCP_CHK_PROG: $SAURON_DHCP_CHK_PROG")
   if ($opt_check && $dhcp_conf && ! -x $SAURON_DHCP_CHK_PROG);
+fatal("cannot find/execute SAURON_DHCP6_CHK_PROG: $SAURON_DHCP6_CHK_PROG")
+  if ($opt_check && $dhcp_conf6 && ! -x $SAURON_DHCP6_CHK_PROG);
 fatal("--dhcpclass can only be used with --dhcp option")
   if ($opt_dhcpclass && not $opt_dhcp);
 fatal("--dhcpvlans can only be used with --dhcp option")
