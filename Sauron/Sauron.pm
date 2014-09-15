@@ -69,7 +69,8 @@ sub set_defaults() {
   $main::SAURON_AUTH_MODE = 0;
   $main::SAURON_AUTH_PROG = '';
   $main::SAURON_DHCP_CHK_PROG = '';
-  $main::SAURON_DHCP_CHK_ARGS = '-q -t -cf';
+  $main::SAURON_DHCP_CHK_ARGS  = '-4 -q -t -cf';
+  $main::SAURON_DHCP6_CHK_ARGS = '-6 -q -t -cf';
   $main::SAURON_NAMED_CHK_PROG = '';
   $main::SAURON_NAMED_CHK_ARGS = '';
   $main::SAURON_ZONE_CHK_PROG = '';
@@ -144,6 +145,8 @@ sub print_config() {
   print "SAURON_AUTH_PROG=",$main::SAURON_AUTH_PROG,"\n";
   print "SAURON_DHCP_CHK_PROG=",$main::SAURON_DHCP_CHK_PROG,"\n";
   print "SAURON_DHCP_CHK_ARGS=",$main::SAURON_DHCP_CHK_ARGS,"\n";
+  print "SAURON_DHCP6_CHK_PROG=",$main::SAURON_DHCP6_CHK_PROG,"\n";
+  print "SAURON_DHCP6_CHK_ARGS=",$main::SAURON_DHCP6_CHK_ARGS,"\n";
   print "SAURON_NAMED_CHK_PROG=",$main::SAURON_NAMED_CHK_PROG,"\n";
   print "SAURON_NAMED_CHK_ARGS=",$main::SAURON_NAMED_CHK_ARGS,"\n";
   print "SAURON_ZONE_CHK_PROG=",$main::SAURON_ZONE_CHK_PROG,"\n";
