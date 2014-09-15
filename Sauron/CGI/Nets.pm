@@ -482,10 +482,12 @@ sub menu_handler {
         $net{last} = ip_compress_address(($netrange + ($netrange->size() - 1))->ip(), $inetFamily) if $inetFamily == 6;
         $net{ssize}= $net{size} - 1;
     }
-
+   
     $net{avail} = $net{ssize}- $net{inuse};
-    $net{inusep}=sprintf("%3.0f", ($net{inuse} / $net{size})*100) ."%";
 
+    use Math::BigFloat;
+    $net{inusep}=sprintf("%.1f%%", (Math::BigFloat->new($net{inuse}) / $net{size}) * 100) if $inetFamily == 4;
+    $net{inusep}=sprintf("%.5f%%", (Math::BigFloat->new($net{inuse}) / $net{size}) * 100) if $inetFamily == 6;
     print "<TABLE width=\"100%\"><TR><TD valign=\"top\">";
 
     if($inetFamily == 6) {
