@@ -180,8 +180,8 @@ sub db_encode_str($) {
 
   return "NULL" if ($str eq '');
   $str =~ s/\\/\\\\/g;
-  $str =~ s/\'/\\\'/g;
-  #$str =~ s/\'/\'\'/g;
+  #$str =~ s/\'/\\\'/g;
+  $str =~ s/\'/\'\'/g;
   return "'" . $str . "'";
 }
 
@@ -194,7 +194,8 @@ sub db_build_list_str($) {
 
   foreach $f (@{$list}) {
     $tmp.="," if ($tmp);
-    $f =~ s/\'/\\\'/g;
+    #$f =~ s/\'/\\\'/g;
+    $f =~ s/\'/\'\'/g;
     $f =~ s/\"/\\\\\"/g;
     $tmp.="\"$f\"";
   }

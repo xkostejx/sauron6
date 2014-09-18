@@ -2944,7 +2944,7 @@ fatal("--check option used but SAURON_ZONE_CHK_PROG not configured!")
 fatal("--check option used but SAURON_DHCP_CHK_PROG not configured!")
   if ($opt_check && $dhcp_conf && ! $SAURON_DHCP_CHK_PROG);
 fatal("--check option used but SAURON_DHCP6_CHK_PROG not configured!")
-  if ($opt_check && $dhcp_conf6 && ! $SAURON_DHCP6_CHK_PROG);
+  if ($opt_check && $dhcp6_conf && ! $SAURON_DHCP6_CHK_PROG);
 fatal("cannot find/execute SAURON_NAMED_CHK_PROG: $SAURON_NAMED_CHK_PROG")
   if ($opt_check && $bind_conf && ! -x $SAURON_NAMED_CHK_PROG);
 fatal("cannot find/execute SAURON_ZONE_CHK_PROG: $SAURON_ZONE_CHK_PROG")
@@ -2952,7 +2952,7 @@ fatal("cannot find/execute SAURON_ZONE_CHK_PROG: $SAURON_ZONE_CHK_PROG")
 fatal("cannot find/execute SAURON_DHCP_CHK_PROG: $SAURON_DHCP_CHK_PROG")
   if ($opt_check && $dhcp_conf && ! -x $SAURON_DHCP_CHK_PROG);
 fatal("cannot find/execute SAURON_DHCP6_CHK_PROG: $SAURON_DHCP6_CHK_PROG")
-  if ($opt_check && $dhcp_conf6 && ! -x $SAURON_DHCP6_CHK_PROG);
+  if ($opt_check && $dhcp6_conf && ! -x $SAURON_DHCP6_CHK_PROG);
 fatal("--dhcpclass can only be used with --dhcp option")
   if ($opt_dhcpclass && not $opt_dhcp);
 fatal("--dhcpvlans can only be used with --dhcp option")

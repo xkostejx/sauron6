@@ -128,8 +128,8 @@ if ($opt_name) {
 }
 
 if ($opt_info) {
-  $info=" AND (h.info ~* '$opt_info' OR h.huser ~* '$opt_info' " .
-        " OR h.dept ~* '$opt_info' OR h.location ~* '$opt_info') ";
+  $info=" AND (h.info ~* " . db_encode_str($opt_info) . " OR h.huser ~* " . db_encode_str($opt_info) .  
+        " OR h.dept ~* " . db_encode_str($opt_info) . " OR h.location ~* " . db_encode_str($opt_info) . ") ";
   print "Host info regexp: $opt_info\n";
 }
 
