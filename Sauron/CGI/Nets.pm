@@ -472,17 +472,26 @@ sub menu_handler {
     #$net{hostmask}= $netrange->mask();
     $net{broadcast}= ip_compress_address($netrange->last_ip(), $inetFamily);
     $net{size}= $netrange->size();
-    $net{first}= ip_compress_address(($netrange + 1)->ip(), $inetFamily);
-
-    if($inetFamily == 4) {
-        $net{last} = ip_compress_address(($netrange + ($netrange->size() - 2))->ip(), $inetFamily) if $inetFamily == 4;
-        $net{ssize}= $net{size} - 2;
-    }
-    elsif($inetFamily == 6) {
-        $net{last} = ip_compress_address(($netrange + ($netrange->size() - 1))->ip(), $inetFamily) if $inetFamily == 6;
-        $net{ssize}= $net{size} - 1;
-    }
    
+    # Dirty hack for /31,/32 & /127, /128 subnets:] 
+    if($net{size} <= 2) {
+        $net{first}= ip_compress_address(($netrange)->ip(), $inetFamily); 
+        $net{last} = ip_compress_address(($netrange)->last_ip(), $inetFamily);
+        $net{ssize} = $netrange->size();
+    }
+    else {
+        $net{first}= ip_compress_address(($netrange + 1)->ip(), $inetFamily);
+
+        if($inetFamily == 4) {
+            $net{last} = ip_compress_address(($netrange + ($netrange->size() - 2))->ip(), $inetFamily) if $inetFamily == 4;
+            $net{ssize}= $net{size} - 2;
+        }
+        elsif($inetFamily == 6) {
+            $net{last} = ip_compress_address(($netrange + ($netrange->size() - 1))->ip(), $inetFamily) if $inetFamily == 6;
+            $net{ssize}= $net{size} - 1;
+        }
+    } 
+
     $net{avail} = $net{ssize}- $net{inuse};
 
     use Math::BigFloat;

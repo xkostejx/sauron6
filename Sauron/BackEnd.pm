@@ -2733,7 +2733,7 @@ sub update_net($) {
     return -102 unless ($net->match($rec->{range_start}));
   }
   if (is_cidr($rec->{range_end})) {
-    return -102 unless ($net->match($rec->{range_end}));
+    return -103 unless ($net->match($rec->{range_end}));
   }
 
   del_std_fields($rec);
@@ -2767,10 +2767,16 @@ sub add_net($) {
   return -100 unless (is_cidr($rec->{net}));
   $net = new Net::IP($rec->{net});
   return -101 unless ($net);
-  $rec->{range_start}= ip_compress_address((++$net)->ip(), $net->version()) 
-    unless (is_cidr($rec->{range_start}));
-  $rec->{range_end}= ($net->version() eq 4 ? new Net::Netmask($rec->{net})->nth(-2) : ip_compress_address($net->last_ip(), $net->version())) 
-   unless (is_cidr($rec->{range_end}));
+
+  # Dirty hack for /31,/32 & /127, /128 subnets:]
+  if($net->size() <= 2) {
+      $rec->{range_start} = ip_compress_address(($net)->ip(), $net->version()) unless (is_cidr($rec->{range_start}));
+      $rec->{range_end}   = ip_compress_address($net->last_ip(), $net->version()) unless (is_cidr($rec->{range_end}));
+  }
+  else {
+      $rec->{range_start} = ip_compress_address((++$net)->ip(), $net->version()) unless (is_cidr($rec->{range_start}));
+      $rec->{range_end}= ($net->version() eq 4 ? new Net::Netmask($rec->{net})->nth(-2) : ip_compress_address($net->last_ip(), $net->version())) unless (is_cidr($rec->{range_end}));
+  }
 
   $res = add_record('nets',$rec);
   if ($res < 0) { db_rollback(); return -1; }
